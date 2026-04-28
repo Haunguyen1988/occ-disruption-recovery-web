@@ -50,6 +50,8 @@ function createSingleSwapOption(
     flightChanges.push({
       flight_id: flight.flight_id,
       flight_number: flight.flight_number,
+      origin: flight.origin,
+      destination: flight.destination,
       original_aircraft: flight.aircraft_id,
       new_aircraft: newAcId,
       original_std: flight.std,
@@ -73,6 +75,7 @@ function createSingleSwapOption(
     max_delay_minutes: 0,
     impacted_flight_count: flightChanges.length,
     swap_count: 1,
+    curfew_violations: 0,
     risk_level: candidate.risk_level,
     score: 0,
     rank: null,

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { runSimulation, findImpactedFlights } from "@/lib/engine";
+import {
+  runSimulation,
+  runMultiEventSimulation,
+  findImpactedFlights,
+  isInCurfew,
+} from "@/lib/engine";
 import { decodeMetar, evaluateMetar } from "@/lib/decoders/metar";
 import { decodeNotam } from "@/lib/decoders/notam";
 import { getDefaultRules } from "@/lib/parsers/rules";
@@ -178,5 +183,149 @@ describe("NOTAM decoder", () => {
     expect(n.q_code).toBe("QMRLC");
     expect(n.airport).toBe("VVTS");
     expect(n.category).toBe("RUNWAY_CLOSED");
+  });
+});
+
+describe("curfew enforcement (K6)", () => {
+  it("flags PQC arrival inside 23:00–05:00 local window (UTC+7)", () => {
+    // 2026-04-28T17:30Z = 00:30 local at PQC (UTC+7) → inside curfew
+    expect(
+      isInCurfew("PQC", new Date("2026-04-28T17:30:00Z"), RULES),
+    ).toBe(true);
+  });
+
+  it("does not flag PQC arrival at 13:30Z (= 20:30 local, outside curfew)", () => {
+    expect(
+      isInCurfew("PQC", new Date("2026-04-28T13:30:00Z"), RULES),
+    ).toBe(false);
+  });
+
+  it("returns false when airport has no configured curfew", () => {
+    expect(
+      isInCurfew("HAN", new Date("2026-04-28T17:30:00Z"), RULES),
+    ).toBe(false);
+  });
+
+  it("penalises options whose flight changes land inside curfew", () => {
+    // VJ103 SGN→PQC originally STA 13:30Z (= 20:30 PQC local). The PQC curfew
+    // window is 23:00–05:00 local (= 16:00Z–22:00Z UTC). An AOG covering only
+    // VJ103's window pushes its new STA to ~16:10Z (= 23:10 local) → curfew.
+    const shortAog: DisruptionEvent = {
+      event_id: "EVT-SHORT",
+      event_type: "AOG",
+      start_time: new Date("2026-04-28T11:30:00Z"),
+      end_time: new Date("2026-04-28T14:00:00Z"),
+      severity: "HIGH",
+      description: "Targeted ground time pushing VJ103 into PQC curfew",
+      affected_aircraft: "VJ-A321",
+      affected_airport: null,
+      affected_flight_id: null,
+    };
+    const result = runSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruption: shortAog,
+      rules: RULES,
+    });
+    const delayOpt = result.ranked_options.find(
+      (o) => o.option_type === "DELAY_ONLY",
+    );
+    expect(delayOpt).toBeTruthy();
+    expect(delayOpt!.curfew_violations).toBeGreaterThan(0);
+    expect(delayOpt!.score_breakdown.curfew_component).toBeGreaterThan(0);
+    expect(
+      delayOpt!.reason_codes.some((r) => r.includes("curfew window")),
+    ).toBe(true);
+  });
+});
+
+describe("multi-event simulation (K10)", () => {
+  it("returns empty result when no events are passed", () => {
+    const r = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [],
+      rules: RULES,
+    });
+    expect(r.events).toEqual([]);
+    expect(r.impacted_flights).toEqual([]);
+    expect(r.ranked_options).toEqual([]);
+  });
+
+  it("delegates to single-event path when one event is passed", () => {
+    const single = runSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruption: AOG,
+      rules: RULES,
+    });
+    const multi = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [AOG],
+      rules: RULES,
+    });
+    expect(multi.impacted_flights.map((i) => i.flight.flight_id).sort()).toEqual(
+      single.impacted_flights.map((i) => i.flight.flight_id).sort(),
+    );
+  });
+
+  it("unions impacted flights from concurrent AOG + airport closure", () => {
+    const closeHan: DisruptionEvent = {
+      event_id: "EVT-CLOSE-HAN",
+      event_type: "AIRPORT_CLOSE",
+      start_time: new Date("2026-04-28T03:30:00Z"),
+      end_time: new Date("2026-04-28T05:30:00Z"),
+      severity: "HIGH",
+      description: "HAN runway closure",
+      affected_aircraft: null,
+      affected_airport: "HAN",
+      affected_flight_id: null,
+    };
+    const result = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [AOG, closeHan],
+      rules: RULES,
+    });
+    expect(result.events.length).toBe(2);
+    // VJ102-D1 is impacted by both AOG (downstream of VJ-A321) and HAN closure
+    // (departure from HAN inside the closure window). Reason codes must reflect
+    // both events on this flight.
+    const vj102 = result.impacted_flights.find(
+      (i) => i.flight.flight_id === "VJ102-D1",
+    );
+    expect(vj102).toBeTruthy();
+    const reasons = vj102!.reason_codes.join(" | ");
+    expect(reasons).toContain("AOG aircraft");
+    expect(reasons).toContain("HAN");
+    expect(result.ranked_options[0].rank).toBe(1);
+  });
+
+  it("excludes AOG'd aircraft from the swap candidate pool", () => {
+    const aogA324: DisruptionEvent = {
+      event_id: "EVT-AOG-A324",
+      event_type: "AOG",
+      start_time: new Date("2026-04-28T00:00:00Z"),
+      end_time: new Date("2026-04-28T05:00:00Z"),
+      severity: "HIGH",
+      description: "Spare also AOG",
+      affected_aircraft: "VJ-A324",
+      affected_airport: null,
+      affected_flight_id: null,
+    };
+    const result = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [AOG, aogA324],
+      rules: RULES,
+    });
+    // No SINGLE_SWAP option should propose VJ-A324 since it is also AOG.
+    const swapOptions = result.ranked_options.filter(
+      (o) => o.option_type === "SINGLE_SWAP",
+    );
+    for (const opt of swapOptions) {
+      expect(Object.values(opt.aircraft_changes)).not.toContain("VJ-A324");
+    }
   });
 });

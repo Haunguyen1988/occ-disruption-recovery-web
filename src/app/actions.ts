@@ -184,6 +184,7 @@ export async function persistSimulation(
       max_delay_minutes: o.max_delay_minutes,
       impacted_flight_count: o.impacted_flight_count,
       swap_count: o.swap_count,
+      curfew_violations: o.curfew_violations,
       recommendation: o.recommendation,
       reason_codes: o.reason_codes,
       score_breakdown: o.score_breakdown,
