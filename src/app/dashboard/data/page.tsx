@@ -3,6 +3,11 @@
 import { useRef, useState } from "react";
 import { useData } from "@/components/data-context";
 import { cn, formatDateTime } from "@/lib/utils";
+import {
+  persistAircraft,
+  persistDisruption,
+  persistSchedule,
+} from "@/app/actions";
 
 export default function DataPage() {
   const {
@@ -13,20 +18,70 @@ export default function DataPage() {
     loadAircraftFile,
     loadDisruptionFile,
     validation,
+    session,
   } = useData();
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+  const canWrite = session?.role === "controller" || session?.role === "admin";
+  const hasErrors = validation.some((v) => v.level === "error");
+
+  async function handleSaveAll() {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const results: string[] = [];
+      if (schedule.length) {
+        const r = await persistSchedule(schedule);
+        if (!r.ok) throw new Error(`schedule: ${r.message}`);
+        results.push(`${r.data?.count ?? 0} flights`);
+      }
+      if (aircraft.length) {
+        const r = await persistAircraft(aircraft);
+        if (!r.ok) throw new Error(`aircraft: ${r.message}`);
+        results.push(`${r.data?.count ?? 0} aircraft`);
+      }
+      if (disruption) {
+        const r = await persistDisruption(disruption);
+        if (!r.ok) throw new Error(`disruption: ${r.message}`);
+        results.push("1 disruption");
+      }
+      setSaveMsg(`Saved to Supabase: ${results.join(", ")}.`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Data import
-        </h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Upload CSV or Excel files for schedule, aircraft, and disruption
-          events. Sample files are pre-loaded for demo.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Data import
+          </h1>
+          <p className="text-sm text-zinc-500 mt-1">
+            Upload CSV or Excel files for schedule, aircraft, and disruption
+            events. Sample files are pre-loaded for demo.
+          </p>
+        </div>
+        {canWrite && (
+          <button
+            onClick={handleSaveAll}
+            disabled={saving || hasErrors || (!schedule.length && !aircraft.length && !disruption)}
+            className="h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium px-4 disabled:opacity-50 hover:opacity-90"
+          >
+            {saving ? "Saving…" : "Save to Supabase"}
+          </button>
+        )}
       </div>
+      {saveMsg && (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+          {saveMsg}
+        </div>
+      )}
 
       {error && (
         <div className="rounded border border-[color:var(--danger)] bg-red-50 p-3 text-sm text-red-800">

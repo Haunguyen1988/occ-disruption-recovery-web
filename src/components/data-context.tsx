@@ -24,6 +24,7 @@ import type {
   FlightLeg,
   OccRules,
 } from "@/lib/types";
+import type { SessionInfo } from "@/lib/supabase/queries";
 
 interface DataState {
   schedule: FlightLeg[];
@@ -33,6 +34,7 @@ interface DataState {
   rulesYaml: string;
   validation: ValidationIssue[];
   isLoaded: boolean;
+  session: SessionInfo | null;
 }
 
 interface DataActions {
@@ -110,12 +112,32 @@ score_weights:
   priority_protection_bonus: 40
 `;
 
-export function DataProvider({ children }: { children: ReactNode }) {
-  const [schedule, setSchedule] = useState<FlightLeg[]>([]);
-  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
-  const [disruption, setDisruption] = useState<DisruptionEvent | null>(null);
+export interface DataProviderProps {
+  children: ReactNode;
+  initialSession?: SessionInfo | null;
+  initialSchedule?: FlightLeg[] | null;
+  initialAircraft?: Aircraft[] | null;
+  initialDisruption?: DisruptionEvent | null;
+}
+
+export function DataProvider({
+  children,
+  initialSession = null,
+  initialSchedule = null,
+  initialAircraft = null,
+  initialDisruption = null,
+}: DataProviderProps) {
+  const [schedule, setSchedule] = useState<FlightLeg[]>(initialSchedule ?? []);
+  const [aircraft, setAircraft] = useState<Aircraft[]>(initialAircraft ?? []);
+  const [disruption, setDisruption] = useState<DisruptionEvent | null>(
+    initialDisruption ?? null,
+  );
   const [rulesYaml, setRulesYaml] = useState(DEFAULT_RULES_YAML);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const seededFromServer = Boolean(
+    initialSchedule?.length || initialAircraft?.length || initialDisruption,
+  );
+  const [isLoaded, setIsLoaded] = useState(seededFromServer);
+  const [session] = useState<SessionInfo | null>(initialSession);
 
   const rules = useMemo<OccRules>(() => {
     try {
@@ -175,11 +197,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setIsLoaded(false);
   }, []);
 
-  // Auto-load sample data on first mount for instant demo. We schedule the
-  // load asynchronously to avoid synchronously updating state during the
-  // effect body (Next.js 16 / React canary lint rule).
+  // Auto-load sample data on first mount only when running in stub mode
+  // (no Supabase session). With a session, the layout already supplied
+  // server-side data.
   useEffect(() => {
-    if (isLoaded) return;
+    if (isLoaded || session) return;
     let cancelled = false;
     Promise.resolve().then(() => {
       if (!cancelled) void loadSampleData("aog");
@@ -187,7 +209,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, loadSampleData]);
+  }, [isLoaded, session, loadSampleData]);
 
   const value = useMemo(
     () => ({
@@ -198,6 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rulesYaml,
       validation,
       isLoaded,
+      session,
       loadScheduleFile,
       loadAircraftFile,
       loadDisruptionFile,
@@ -214,6 +237,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       rulesYaml,
       validation,
       isLoaded,
+      session,
       loadScheduleFile,
       loadAircraftFile,
       loadDisruptionFile,
@@ -227,6 +251,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
 export function useData() {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("useData must be used inside DataProvider");
+  if (!ctx) throw new Error("useData must be used within DataProvider");
   return ctx;
 }
