@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+EVT-DAD-WX-001,WEATHER,,DAD,,2026-04-28T13:00:00,2026-04-28T17:00:00,MEDIUM,DAD weather capacity reduction risk
