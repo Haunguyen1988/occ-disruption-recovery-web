@@ -1,0 +1,107 @@
+import { describe, it, expect } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as XLSX from "xlsx";
+import { looksLikeAimsDayRep, parseAimsDayRep } from "@/lib/parsers/aims";
+
+function loadFixtureMatrix(): unknown[][] {
+  const file = path.join(
+    __dirname,
+    "fixtures",
+    "aims_dayrep_sample.xlsx",
+  );
+  const buf = fs.readFileSync(file);
+  const wb = XLSX.read(buf, { type: "buffer", cellDates: false });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    defval: "",
+    header: 1,
+    raw: false,
+  });
+}
+
+describe("AIMS DayRep parser", () => {
+  it("detects AIMS layout via row-5 header signature", () => {
+    const m = loadFixtureMatrix();
+    expect(looksLikeAimsDayRep(m)).toBe(true);
+  });
+
+  it("rejects layouts that do not match the canonical header", () => {
+    expect(looksLikeAimsDayRep([])).toBe(false);
+    expect(
+      looksLikeAimsDayRep([
+        [],
+        [],
+        [],
+        [],
+        [],
+        ["foo", "bar", "baz", "", "qux"],
+      ]),
+    ).toBe(false);
+  });
+
+  it("parses the full DayRep into 325 flights with 0 errors", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    const errors = r.issues.filter((i) => i.level === "error");
+    expect(errors).toHaveLength(0);
+    expect(r.schedule).toHaveLength(325);
+    expect(r.detectedFormat).toBe("aims_dayrep");
+  });
+
+  it("derives 73 unique aircraft from REG column", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    expect(r.aircraft).toHaveLength(73);
+    const types = new Set(r.aircraft.map((a) => a.aircraft_type));
+    expect(types).toEqual(new Set(["A320", "A321", "A330"]));
+  });
+
+  it("rolls overnight STA to next day", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    // Sample row: 28/04/26  2980  VN-A516  321  CXR  HAN  23:50  01:35
+    const overnight = r.schedule.find(
+      (f) => f.flight_number === "2980" && f.aircraft_id === "VN-A516",
+    );
+    expect(overnight).toBeDefined();
+    expect(overnight!.std.toISOString()).toBe("2026-04-28T23:50:00.000Z");
+    expect(overnight!.sta.toISOString()).toBe("2026-04-29T01:35:00.000Z");
+  });
+
+  it("aircraft current_station = first DEP, available_from = earliest STD", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    const a200 = r.aircraft.find((a) => a.aircraft_id === "VN-A200");
+    expect(a200).toBeDefined();
+    // VN-A200 first leg in fixture is 28/04/26 463 HAN→VCA STD 10:20.
+    expect(a200!.current_station).toBe("HAN");
+    expect(a200!.available_from.toISOString()).toBe(
+      "2026-04-28T10:20:00.000Z",
+    );
+  });
+
+  it("flags is_international for non-VN destinations", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    const intl = r.schedule.find(
+      (f) => f.destination === "ICN" || f.origin === "NRT",
+    );
+    expect(intl).toBeDefined();
+    expect(intl!.is_international).toBe(true);
+
+    const dom = r.schedule.find(
+      (f) => f.origin === "HAN" && f.destination === "SGN",
+    );
+    expect(dom).toBeDefined();
+    expect(dom!.is_international).toBe(false);
+  });
+
+  it("marks last leg of each rotation as is_last_flight_of_day", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    const counts = new Map<string, number>();
+    for (const f of r.schedule) {
+      if (f.is_last_flight_of_day) {
+        counts.set(f.aircraft_id, (counts.get(f.aircraft_id) ?? 0) + 1);
+      }
+    }
+    // Exactly one last-flight per aircraft.
+    for (const [, n] of counts) expect(n).toBe(1);
+    expect(counts.size).toBe(73);
+  });
+});

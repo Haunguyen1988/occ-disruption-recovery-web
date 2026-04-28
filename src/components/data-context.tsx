@@ -10,13 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import {
+  parseAircraftRows,
   parseCsvOrXlsx,
-  rowsToAircraft,
-  rowsToDisruption,
-  rowsToSchedule,
+  parseDisruptionRows,
+  parseScheduleRows,
   validateDataset,
   type ValidationIssue,
 } from "@/lib/parsers/csv";
+import { tryParseAimsWorkbook } from "@/lib/parsers/aims";
 import { getDefaultRules, parseRulesYaml } from "@/lib/parsers/rules";
 import type {
   Aircraft,
@@ -33,6 +34,12 @@ interface DataState {
   rules: OccRules;
   rulesYaml: string;
   validation: ValidationIssue[];
+  parseIssues: {
+    schedule: ValidationIssue[];
+    aircraft: ValidationIssue[];
+    disruption: ValidationIssue[];
+  };
+  detectedFormat: "aims_dayrep" | null;
   isLoaded: boolean;
   session: SessionInfo | null;
 }
@@ -133,6 +140,14 @@ export function DataProvider({
     initialDisruption ?? null,
   );
   const [rulesYaml, setRulesYaml] = useState(DEFAULT_RULES_YAML);
+  const [parseIssues, setParseIssues] = useState<DataState["parseIssues"]>({
+    schedule: [],
+    aircraft: [],
+    disruption: [],
+  });
+  const [detectedFormat, setDetectedFormat] = useState<
+    DataState["detectedFormat"]
+  >(null);
   const seededFromServer = Boolean(
     initialSchedule?.length || initialAircraft?.length || initialDisruption,
   );
@@ -153,18 +168,37 @@ export function DataProvider({
   );
 
   const loadScheduleFile = useCallback(async (file: File) => {
+    const aims = await tryParseAimsWorkbook(file);
+    if (aims) {
+      setSchedule(aims.schedule);
+      setAircraft(aims.aircraft);
+      setDetectedFormat(aims.detectedFormat);
+      setParseIssues((p) => ({
+        ...p,
+        schedule: aims.issues,
+        aircraft: [],
+      }));
+      return;
+    }
     const rows = await parseCsvOrXlsx(file);
-    setSchedule(rowsToSchedule(rows));
+    const { data, issues } = parseScheduleRows(rows);
+    setSchedule(data);
+    setDetectedFormat(null);
+    setParseIssues((p) => ({ ...p, schedule: issues }));
   }, []);
 
   const loadAircraftFile = useCallback(async (file: File) => {
     const rows = await parseCsvOrXlsx(file);
-    setAircraft(rowsToAircraft(rows));
+    const { data, issues } = parseAircraftRows(rows);
+    setAircraft(data);
+    setParseIssues((p) => ({ ...p, aircraft: issues }));
   }, []);
 
   const loadDisruptionFile = useCallback(async (file: File) => {
     const rows = await parseCsvOrXlsx(file);
-    setDisruption(rowsToDisruption(rows));
+    const { data, issues } = parseDisruptionRows(rows);
+    setDisruption(data[0] ?? null);
+    setParseIssues((p) => ({ ...p, disruption: issues }));
   }, []);
 
   const loadSampleData = useCallback(
@@ -182,9 +216,17 @@ export function DataProvider({
         fetchRows(SAMPLE_FILES.aircraft),
         fetchRows(SAMPLE_FILES[scenario]),
       ]);
-      setSchedule(rowsToSchedule(s));
-      setAircraft(rowsToAircraft(a));
-      setDisruption(rowsToDisruption(d));
+      const sched = parseScheduleRows(s);
+      const ac = parseAircraftRows(a);
+      const dis = parseDisruptionRows(d);
+      setSchedule(sched.data);
+      setAircraft(ac.data);
+      setDisruption(dis.data[0] ?? null);
+      setParseIssues({
+        schedule: sched.issues,
+        aircraft: ac.issues,
+        disruption: dis.issues,
+      });
       setIsLoaded(true);
     },
     [],
@@ -194,6 +236,8 @@ export function DataProvider({
     setSchedule([]);
     setAircraft([]);
     setDisruption(null);
+    setParseIssues({ schedule: [], aircraft: [], disruption: [] });
+    setDetectedFormat(null);
     setIsLoaded(false);
   }, []);
 
@@ -219,6 +263,8 @@ export function DataProvider({
       rules,
       rulesYaml,
       validation,
+      parseIssues,
+      detectedFormat,
       isLoaded,
       session,
       loadScheduleFile,
@@ -236,6 +282,8 @@ export function DataProvider({
       rules,
       rulesYaml,
       validation,
+      parseIssues,
+      detectedFormat,
       isLoaded,
       session,
       loadScheduleFile,

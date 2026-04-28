@@ -8,10 +8,69 @@ import type {
   Severity,
 } from "@/lib/types";
 
+// ---------------------------------------------------------------------------
+// Issue model — per-row, per-column error reporting (Sprint 5 hardening)
+// ---------------------------------------------------------------------------
+
+export type IssueLevel = "error" | "warning";
+
+export interface ValidationIssue {
+  level: IssueLevel;
+  message: string;
+  /** 1-based source row number including the header (header is row 1). */
+  row?: number;
+  column?: string;
+  value?: string;
+  /** Logical dataset the issue belongs to. */
+  source?: "schedule" | "aircraft" | "disruption" | "dataset";
+}
+
+export interface ParseResult<T> {
+  data: T[];
+  issues: ValidationIssue[];
+}
+
+const DISRUPTION_TYPES: DisruptionType[] = [
+  "AOG",
+  "AIRPORT_CLOSE",
+  "WEATHER",
+  "LATE_ARRIVAL",
+];
+const SEVERITIES: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const AIRCRAFT_STATUSES = ["ACTIVE", "AOG", "MAINTENANCE", "STORED"] as const;
+
+const SCHEDULE_REQUIRED = [
+  "flight_id",
+  "flight_number",
+  "origin",
+  "destination",
+  "std",
+  "sta",
+  "aircraft_id",
+] as const;
+
+const AIRCRAFT_REQUIRED = [
+  "aircraft_id",
+  "aircraft_type",
+  "current_station",
+  "available_from",
+] as const;
+
+const DISRUPTION_REQUIRED = [
+  "event_id",
+  "event_type",
+  "start_time",
+  "end_time",
+] as const;
+
+// ---------------------------------------------------------------------------
+// Low-level parsing helpers
+// ---------------------------------------------------------------------------
+
 function parseDate(value: unknown): Date {
   if (value instanceof Date) return value;
   if (typeof value === "number") {
-    // Excel serial date — naive conversion
+    // Excel serial date — naive conversion (days since 1899-12-30 UTC).
     const epoch = new Date(Date.UTC(1899, 11, 30));
     return new Date(epoch.getTime() + value * 86400000);
   }
@@ -39,6 +98,51 @@ function parseBool(value: unknown): boolean {
   );
 }
 
+const IATA_RE = /^[A-Z]{3}$/;
+
+function pushAirportIssue(
+  issues: ValidationIssue[],
+  row: number,
+  column: string,
+  value: string,
+  source: ValidationIssue["source"],
+) {
+  if (!value) return;
+  if (!IATA_RE.test(value)) {
+    issues.push({
+      level: "warning",
+      message: `'${value}' is not a 3-letter IATA airport code (uppercase A-Z)`,
+      row,
+      column,
+      value,
+      source,
+    });
+  }
+}
+
+function checkRequiredHeaders(
+  rows: ParsedRows,
+  required: readonly string[],
+  source: ValidationIssue["source"],
+): ValidationIssue[] {
+  if (rows.length === 0) return [];
+  const headers = new Set(Object.keys(rows[0] ?? {}).map((h) => h.trim()));
+  const missing = required.filter((c) => !headers.has(c));
+  if (missing.length === 0) return [];
+  return [
+    {
+      level: "error",
+      message: `Missing required column(s): ${missing.join(", ")}`,
+      row: 1,
+      source,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Public API: file parsing
+// ---------------------------------------------------------------------------
+
 export type ParsedRows = Record<string, unknown>[];
 
 export async function parseCsvOrXlsx(file: File | Blob): Promise<ParsedRows> {
@@ -58,61 +162,331 @@ export async function parseCsvOrXlsx(file: File | Blob): Promise<ParsedRows> {
   return result.data as ParsedRows;
 }
 
-export function rowsToSchedule(rows: ParsedRows): FlightLeg[] {
-  return rows
-    .filter((r) => r.flight_id)
-    .map((r) => ({
+// ---------------------------------------------------------------------------
+// Per-dataset parsers — collect issues, never throw on bad rows
+// ---------------------------------------------------------------------------
+
+export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
+  const issues = checkRequiredHeaders(rows, SCHEDULE_REQUIRED, "schedule");
+  if (issues.some((i) => i.level === "error")) {
+    return { data: [], issues };
+  }
+  const data: FlightLeg[] = [];
+  rows.forEach((r, idx) => {
+    const row = idx + 2; // header is row 1
+    if (!r.flight_id) {
+      // Silent skip for blank rows; flag if any other required field is set.
+      const hasOther =
+        r.flight_number || r.origin || r.destination || r.std || r.sta;
+      if (hasOther) {
+        issues.push({
+          level: "error",
+          message: "Row missing flight_id",
+          row,
+          column: "flight_id",
+          source: "schedule",
+        });
+      }
+      return;
+    }
+
+    let std: Date;
+    let sta: Date;
+    try {
+      std = parseDate(r.std);
+    } catch {
+      issues.push({
+        level: "error",
+        message: `Cannot parse std (use ISO 8601, e.g. 2026-04-28T07:00:00Z)`,
+        row,
+        column: "std",
+        value: String(r.std ?? ""),
+        source: "schedule",
+      });
+      return;
+    }
+    try {
+      sta = parseDate(r.sta);
+    } catch {
+      issues.push({
+        level: "error",
+        message: `Cannot parse sta (use ISO 8601, e.g. 2026-04-28T09:10:00Z)`,
+        row,
+        column: "sta",
+        value: String(r.sta ?? ""),
+        source: "schedule",
+      });
+      return;
+    }
+
+    const origin = String(r.origin ?? "").trim();
+    const destination = String(r.destination ?? "").trim();
+    pushAirportIssue(issues, row, "origin", origin, "schedule");
+    pushAirportIssue(issues, row, "destination", destination, "schedule");
+
+    const priority = Number(r.priority_level ?? 3);
+    const loadFactor = Number(r.load_factor ?? 0);
+    if (Number.isNaN(priority)) {
+      issues.push({
+        level: "warning",
+        message: "priority_level is not numeric — defaulting to 3",
+        row,
+        column: "priority_level",
+        value: String(r.priority_level ?? ""),
+        source: "schedule",
+      });
+    }
+    if (Number.isNaN(loadFactor)) {
+      issues.push({
+        level: "warning",
+        message: "load_factor is not numeric — defaulting to 0",
+        row,
+        column: "load_factor",
+        value: String(r.load_factor ?? ""),
+        source: "schedule",
+      });
+    }
+
+    data.push({
       flight_id: String(r.flight_id),
       flight_number: String(r.flight_number ?? ""),
-      origin: String(r.origin ?? ""),
-      destination: String(r.destination ?? ""),
-      std: parseDate(r.std),
-      sta: parseDate(r.sta),
+      origin,
+      destination,
+      std,
+      sta,
       aircraft_id: String(r.aircraft_id ?? ""),
       aircraft_type: String(r.aircraft_type ?? ""),
-      priority_level: Number(r.priority_level ?? 3) || 3,
-      load_factor: Number(r.load_factor ?? 0) || 0,
+      priority_level: Number.isFinite(priority) ? priority : 3,
+      load_factor: Number.isFinite(loadFactor) ? loadFactor : 0,
       is_international: parseBool(r.is_international),
       is_last_flight_of_day: parseBool(r.is_last_flight_of_day),
-    }));
+    });
+  });
+  return { data, issues };
+}
+
+export function parseAircraftRows(rows: ParsedRows): ParseResult<Aircraft> {
+  const issues = checkRequiredHeaders(rows, AIRCRAFT_REQUIRED, "aircraft");
+  if (issues.some((i) => i.level === "error")) {
+    return { data: [], issues };
+  }
+  const data: Aircraft[] = [];
+  const seen = new Set<string>();
+  rows.forEach((r, idx) => {
+    const row = idx + 2;
+    if (!r.aircraft_id) {
+      const hasOther = r.aircraft_type || r.current_station || r.available_from;
+      if (hasOther) {
+        issues.push({
+          level: "error",
+          message: "Row missing aircraft_id",
+          row,
+          column: "aircraft_id",
+          source: "aircraft",
+        });
+      }
+      return;
+    }
+
+    const id = String(r.aircraft_id);
+    if (seen.has(id)) {
+      issues.push({
+        level: "error",
+        message: `Duplicate aircraft_id '${id}'`,
+        row,
+        column: "aircraft_id",
+        value: id,
+        source: "aircraft",
+      });
+      return;
+    }
+    seen.add(id);
+
+    let availableFrom: Date;
+    try {
+      availableFrom = parseDate(r.available_from);
+    } catch {
+      issues.push({
+        level: "error",
+        message: "Cannot parse available_from (use ISO 8601)",
+        row,
+        column: "available_from",
+        value: String(r.available_from ?? ""),
+        source: "aircraft",
+      });
+      return;
+    }
+
+    const station = String(r.current_station ?? "").trim();
+    pushAirportIssue(issues, row, "current_station", station, "aircraft");
+
+    const status = String(r.status ?? "ACTIVE").trim().toUpperCase();
+    if (!(AIRCRAFT_STATUSES as readonly string[]).includes(status)) {
+      issues.push({
+        level: "warning",
+        message: `Unknown status '${status}' (expected one of ${AIRCRAFT_STATUSES.join(", ")})`,
+        row,
+        column: "status",
+        value: status,
+        source: "aircraft",
+      });
+    }
+
+    data.push({
+      aircraft_id: id,
+      aircraft_type: String(r.aircraft_type ?? ""),
+      current_station: station,
+      available_from: availableFrom,
+      status,
+      next_maintenance_time: parseDateOrNull(r.next_maintenance_time),
+      restriction: r.restriction ? String(r.restriction) : null,
+    });
+  });
+  return { data, issues };
+}
+
+export function parseDisruptionRows(
+  rows: ParsedRows,
+): ParseResult<DisruptionEvent> {
+  const issues = checkRequiredHeaders(rows, DISRUPTION_REQUIRED, "disruption");
+  if (issues.some((i) => i.level === "error")) {
+    return { data: [], issues };
+  }
+  const data: DisruptionEvent[] = [];
+  rows.forEach((r, idx) => {
+    const row = idx + 2;
+    if (!r.event_id) {
+      const hasOther = r.event_type || r.start_time || r.end_time;
+      if (hasOther) {
+        issues.push({
+          level: "error",
+          message: "Row missing event_id",
+          row,
+          column: "event_id",
+          source: "disruption",
+        });
+      }
+      return;
+    }
+
+    const eventType = String(r.event_type ?? "").trim().toUpperCase();
+    if (!(DISRUPTION_TYPES as readonly string[]).includes(eventType)) {
+      issues.push({
+        level: "error",
+        message: `Unknown event_type '${eventType}' (expected ${DISRUPTION_TYPES.join(", ")})`,
+        row,
+        column: "event_type",
+        value: eventType,
+        source: "disruption",
+      });
+      return;
+    }
+
+    let startTime: Date;
+    let endTime: Date;
+    try {
+      startTime = parseDate(r.start_time);
+    } catch {
+      issues.push({
+        level: "error",
+        message: "Cannot parse start_time (use ISO 8601)",
+        row,
+        column: "start_time",
+        value: String(r.start_time ?? ""),
+        source: "disruption",
+      });
+      return;
+    }
+    try {
+      endTime = parseDate(r.end_time);
+    } catch {
+      issues.push({
+        level: "error",
+        message: "Cannot parse end_time (use ISO 8601)",
+        row,
+        column: "end_time",
+        value: String(r.end_time ?? ""),
+        source: "disruption",
+      });
+      return;
+    }
+    if (endTime <= startTime) {
+      issues.push({
+        level: "error",
+        message: "end_time must be strictly after start_time",
+        row,
+        column: "end_time",
+        value: String(r.end_time ?? ""),
+        source: "disruption",
+      });
+      return;
+    }
+
+    const severityRaw = String(r.severity ?? "MEDIUM").trim().toUpperCase();
+    const severity: Severity = (SEVERITIES as readonly string[]).includes(
+      severityRaw,
+    )
+      ? (severityRaw as Severity)
+      : "MEDIUM";
+    if (severity !== severityRaw) {
+      issues.push({
+        level: "warning",
+        message: `Unknown severity '${severityRaw}' — defaulting to MEDIUM`,
+        row,
+        column: "severity",
+        value: severityRaw,
+        source: "disruption",
+      });
+    }
+
+    const airport = r.affected_airport ? String(r.affected_airport).trim() : "";
+    if (airport) pushAirportIssue(issues, row, "affected_airport", airport, "disruption");
+
+    data.push({
+      event_id: String(r.event_id),
+      event_type: eventType as DisruptionType,
+      affected_aircraft: r.affected_aircraft
+        ? String(r.affected_aircraft)
+        : null,
+      affected_airport: airport || null,
+      affected_flight_id: r.affected_flight_id
+        ? String(r.affected_flight_id)
+        : null,
+      start_time: startTime,
+      end_time: endTime,
+      severity,
+      description: String(r.description ?? ""),
+    });
+  });
+  return { data, issues };
+}
+
+// ---------------------------------------------------------------------------
+// Backwards-compatible thin wrappers (existing callers still work)
+// ---------------------------------------------------------------------------
+
+export function rowsToSchedule(rows: ParsedRows): FlightLeg[] {
+  return parseScheduleRows(rows).data;
 }
 
 export function rowsToAircraft(rows: ParsedRows): Aircraft[] {
-  return rows
-    .filter((r) => r.aircraft_id)
-    .map((r) => ({
-      aircraft_id: String(r.aircraft_id),
-      aircraft_type: String(r.aircraft_type ?? ""),
-      current_station: String(r.current_station ?? ""),
-      available_from: parseDate(r.available_from),
-      status: String(r.status ?? "ACTIVE"),
-      next_maintenance_time: parseDateOrNull(r.next_maintenance_time),
-      restriction: r.restriction ? String(r.restriction) : null,
-    }));
+  return parseAircraftRows(rows).data;
 }
 
 export function rowsToDisruption(rows: ParsedRows): DisruptionEvent {
-  const r = rows.find((row) => row.event_id);
-  if (!r) throw new Error("No disruption event row found");
-  return {
-    event_id: String(r.event_id),
-    event_type: String(r.event_type) as DisruptionType,
-    affected_aircraft: r.affected_aircraft ? String(r.affected_aircraft) : null,
-    affected_airport: r.affected_airport ? String(r.affected_airport) : null,
-    affected_flight_id: r.affected_flight_id
-      ? String(r.affected_flight_id)
-      : null,
-    start_time: parseDate(r.start_time),
-    end_time: parseDate(r.end_time),
-    severity: String(r.severity ?? "MEDIUM") as Severity,
-    description: String(r.description ?? ""),
-  };
+  const { data, issues } = parseDisruptionRows(rows);
+  if (data[0]) return data[0];
+  const firstError = issues.find((i) => i.level === "error");
+  throw new Error(
+    firstError
+      ? `${firstError.message}${firstError.row ? ` (row ${firstError.row}${firstError.column ? `, column ${firstError.column}` : ""})` : ""}`
+      : "No disruption event row found",
+  );
 }
 
-export interface ValidationIssue {
-  level: "error" | "warning";
-  message: string;
-}
+// ---------------------------------------------------------------------------
+// Cross-dataset validation (FK + timing + load factor sanity)
+// ---------------------------------------------------------------------------
 
 export function validateDataset(input: {
   schedule: FlightLeg[];
@@ -120,25 +494,61 @@ export function validateDataset(input: {
 }): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const aircraftIds = new Set(input.aircraft.map((a) => a.aircraft_id));
+  const flightIds = new Set<string>();
   for (const f of input.schedule) {
+    if (flightIds.has(f.flight_id)) {
+      issues.push({
+        level: "error",
+        message: `Duplicate flight_id '${f.flight_id}'`,
+        column: "flight_id",
+        value: f.flight_id,
+        source: "schedule",
+      });
+    }
+    flightIds.add(f.flight_id);
+
     if (!aircraftIds.has(f.aircraft_id)) {
       issues.push({
         level: "error",
-        message: `Flight ${f.flight_number} (${f.flight_id}) references unknown aircraft ${f.aircraft_id}`,
+        message: `Flight ${f.flight_number} (${f.flight_id}) references unknown aircraft '${f.aircraft_id}'`,
+        column: "aircraft_id",
+        value: f.aircraft_id,
+        source: "dataset",
       });
     }
     if (f.sta <= f.std) {
       issues.push({
         level: "error",
-        message: `Flight ${f.flight_number}: STA (${f.sta.toISOString()}) <= STD (${f.std.toISOString()})`,
+        message: `Flight ${f.flight_number}: STA (${f.sta.toISOString()}) must be after STD (${f.std.toISOString()})`,
+        column: "sta",
+        source: "dataset",
       });
     }
     if (f.load_factor < 0 || f.load_factor > 1) {
       issues.push({
         level: "warning",
         message: `Flight ${f.flight_number}: load_factor ${f.load_factor} outside [0,1]`,
+        column: "load_factor",
+        value: String(f.load_factor),
+        source: "dataset",
       });
     }
   }
   return issues;
 }
+
+// ---------------------------------------------------------------------------
+// Templates — used by /dashboard/data "Download template" buttons
+// ---------------------------------------------------------------------------
+
+export const TEMPLATE_SCHEDULE_CSV =
+  "flight_id,flight_number,origin,destination,std,sta,aircraft_id,aircraft_type,priority_level,load_factor,is_international,is_last_flight_of_day\n" +
+  "FL001,VJ100,SGN,HAN,2026-04-28T07:00:00Z,2026-04-28T09:10:00Z,VJ-A321,A321,1,0.91,false,false\n";
+
+export const TEMPLATE_AIRCRAFT_CSV =
+  "aircraft_id,aircraft_type,current_station,available_from,status,next_maintenance_time,restriction\n" +
+  "VJ-A321,A321,SGN,2026-04-28T06:00:00Z,ACTIVE,2026-04-29T04:00:00Z,\n";
+
+export const TEMPLATE_DISRUPTION_CSV =
+  "event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description\n" +
+  "EVT-AOG-001,AOG,VJ-A321,,FL003,2026-04-28T12:10:00Z,2026-04-28T16:00:00Z,HIGH,AOG VJ-A321 estimated release 16:00Z\n";

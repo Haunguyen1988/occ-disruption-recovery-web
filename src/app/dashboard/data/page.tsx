@@ -8,6 +8,12 @@ import {
   persistDisruption,
   persistSchedule,
 } from "@/app/actions";
+import {
+  TEMPLATE_AIRCRAFT_CSV,
+  TEMPLATE_DISRUPTION_CSV,
+  TEMPLATE_SCHEDULE_CSV,
+  type ValidationIssue,
+} from "@/lib/parsers/csv";
 
 export default function DataPage() {
   const {
@@ -18,14 +24,25 @@ export default function DataPage() {
     loadAircraftFile,
     loadDisruptionFile,
     validation,
+    parseIssues,
+    detectedFormat,
     session,
   } = useData();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [pasteOpen, setPasteOpen] = useState<
+    null | "schedule" | "aircraft" | "disruption"
+  >(null);
 
   const canWrite = session?.role === "controller" || session?.role === "admin";
-  const hasErrors = validation.some((v) => v.level === "error");
+  const allParseErrors = [
+    ...parseIssues.schedule,
+    ...parseIssues.aircraft,
+    ...parseIssues.disruption,
+  ].filter((i) => i.level === "error");
+  const hasErrors =
+    validation.some((v) => v.level === "error") || allParseErrors.length > 0;
 
   async function handleSaveAll() {
     setSaving(true);
@@ -55,6 +72,36 @@ export default function DataPage() {
     }
   }
 
+  async function handlePasteSubmit(
+    kind: "schedule" | "aircraft" | "disruption",
+    text: string,
+  ) {
+    setError(null);
+    setPasteOpen(null);
+    try {
+      // Convert TSV (Excel clipboard default) to CSV if needed.
+      const looksTab = text.includes("\t");
+      const csv = looksTab
+        ? text
+            .split(/\r?\n/)
+            .map((line) =>
+              line
+                .split("\t")
+                .map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c))
+                .join(","),
+            )
+            .join("\n")
+        : text;
+      const blob = new Blob([csv], { type: "text/csv" });
+      const file = new File([blob], `pasted_${kind}.csv`, { type: "text/csv" });
+      if (kind === "schedule") await loadScheduleFile(file);
+      else if (kind === "aircraft") await loadAircraftFile(file);
+      else await loadDisruptionFile(file);
+    } catch (e) {
+      setError(`${kind} paste error: ${(e as Error).message}`);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-start justify-between gap-4">
@@ -63,20 +110,34 @@ export default function DataPage() {
             Data import
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Upload CSV or Excel files for schedule, aircraft, and disruption
-            events. Sample files are pre-loaded for demo.
+            Upload CSV/Excel or paste from clipboard. Required columns and
+            datetime format are validated row-by-row before import.
           </p>
         </div>
         {canWrite && (
           <button
             onClick={handleSaveAll}
-            disabled={saving || hasErrors || (!schedule.length && !aircraft.length && !disruption)}
+            disabled={
+              saving ||
+              hasErrors ||
+              (!schedule.length && !aircraft.length && !disruption)
+            }
             className="h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium px-4 disabled:opacity-50 hover:opacity-90"
           >
             {saving ? "Saving…" : "Save to Supabase"}
           </button>
         )}
       </div>
+      {detectedFormat === "aims_dayrep" && (
+        <div className="rounded border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+          <span className="font-semibold">AIMS DayRepReport detected.</span>{" "}
+          Loaded {schedule.length} flights and derived {aircraft.length}{" "}
+          aircraft from REG column. STD/STA imported as local-station HH:MM and
+          treated as naive UTC for engine math (timezone-aware handling is on
+          the roadmap).
+        </div>
+      )}
+
       {saveMsg && (
         <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           {saveMsg}
@@ -102,7 +163,10 @@ export default function DataPage() {
               setError(`Schedule parse error: ${(e as Error).message}`);
             }
           }}
+          onPaste={() => setPasteOpen("schedule")}
           sample="/sample_schedule.csv"
+          template={TEMPLATE_SCHEDULE_CSV}
+          templateName="template_schedule.csv"
         />
         <Uploader
           title="Aircraft"
@@ -116,7 +180,10 @@ export default function DataPage() {
               setError(`Aircraft parse error: ${(e as Error).message}`);
             }
           }}
+          onPaste={() => setPasteOpen("aircraft")}
           sample="/sample_aircraft.csv"
+          template={TEMPLATE_AIRCRAFT_CSV}
+          templateName="template_aircraft.csv"
         />
         <Uploader
           title="Disruption"
@@ -130,13 +197,40 @@ export default function DataPage() {
               setError(`Disruption parse error: ${(e as Error).message}`);
             }
           }}
+          onPaste={() => setPasteOpen("disruption")}
           sample="/sample_disruption_aog.csv"
+          template={TEMPLATE_DISRUPTION_CSV}
+          templateName="template_disruption.csv"
         />
       </div>
 
+      {pasteOpen && (
+        <PasteDialog
+          kind={pasteOpen}
+          onCancel={() => setPasteOpen(null)}
+          onSubmit={(t) => handlePasteSubmit(pasteOpen, t)}
+        />
+      )}
+
+      <IssuesPanel
+        title="Schedule file"
+        issues={parseIssues.schedule}
+        emptyHint="No parser issues."
+      />
+      <IssuesPanel
+        title="Aircraft file"
+        issues={parseIssues.aircraft}
+        emptyHint="No parser issues."
+      />
+      <IssuesPanel
+        title="Disruption file"
+        issues={parseIssues.disruption}
+        emptyHint="No parser issues."
+      />
+
       {validation.length > 0 && (
         <div className="rounded-lg border border-border p-4">
-          <h3 className="font-semibold text-sm">Validation</h3>
+          <h3 className="font-semibold text-sm">Cross-dataset validation</h3>
           <ul className="mt-2 space-y-1 text-xs">
             {validation.map((v, i) => (
               <li
@@ -231,20 +325,132 @@ export default function DataPage() {
   );
 }
 
+function IssuesPanel({
+  title,
+  issues,
+  emptyHint,
+}: {
+  title: string;
+  issues: ValidationIssue[];
+  emptyHint?: string;
+}) {
+  if (issues.length === 0) return null;
+  const errors = issues.filter((i) => i.level === "error").length;
+  const warnings = issues.filter((i) => i.level === "warning").length;
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">{title}</h3>
+        <div className="flex gap-2 text-xs">
+          {errors > 0 && (
+            <span className="rounded bg-red-100 text-red-800 px-2 py-0.5">
+              {errors} error{errors === 1 ? "" : "s"}
+            </span>
+          )}
+          {warnings > 0 && (
+            <span className="rounded bg-amber-100 text-amber-800 px-2 py-0.5">
+              {warnings} warning{warnings === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      </div>
+      {issues.length === 0 && emptyHint && (
+        <p className="text-xs text-zinc-500 mt-2">{emptyHint}</p>
+      )}
+      <ul className="mt-2 space-y-1 text-xs font-mono">
+        {issues.map((v, i) => (
+          <li
+            key={i}
+            className={cn(
+              "flex flex-wrap gap-2",
+              v.level === "error"
+                ? "text-[color:var(--danger)]"
+                : "text-[color:var(--warning)]",
+            )}
+          >
+            <span className="uppercase">{v.level}</span>
+            {v.row != null && <span>row {v.row}</span>}
+            {v.column && <span>col {v.column}</span>}
+            <span className="font-sans">{v.message}</span>
+            {v.value && (
+              <span className="text-zinc-500">value=&quot;{v.value}&quot;</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PasteDialog({
+  kind,
+  onCancel,
+  onSubmit,
+}: {
+  kind: "schedule" | "aircraft" | "disruption";
+  onCancel: () => void;
+  onSubmit: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <div className="rounded-lg border border-border p-4 bg-muted/40">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-sm">
+          Paste {kind} from Excel/clipboard
+        </h3>
+        <button
+          onClick={onCancel}
+          className="text-xs text-zinc-500 hover:underline"
+        >
+          Cancel
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 mb-2">
+        Header row required. Tab-separated (Excel default) or comma-separated
+        both accepted.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={8}
+        className="w-full rounded border border-border bg-background p-2 text-xs font-mono"
+        placeholder="paste here…"
+      />
+      <div className="mt-2 flex justify-end">
+        <button
+          disabled={!text.trim()}
+          onClick={() => onSubmit(text)}
+          className="h-8 rounded-md bg-primary text-primary-foreground text-xs font-medium px-3 disabled:opacity-50 hover:opacity-90"
+        >
+          Import
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Uploader({
   title,
   count,
   accept,
   onFile,
+  onPaste,
   sample,
+  template,
+  templateName,
 }: {
   title: string;
   count: number;
   accept: string;
   onFile: (f: File) => void | Promise<void>;
+  onPaste: () => void;
   sample: string;
+  template: string;
+  templateName: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const templateHref =
+    "data:text/csv;charset=utf-8," + encodeURIComponent(template);
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center justify-between">
@@ -259,21 +465,37 @@ function Uploader({
         onChange={async (e) => {
           const f = e.target.files?.[0];
           if (f) await onFile(f);
+          if (e.target) e.target.value = "";
         }}
       />
       <button
         onClick={() => ref.current?.click()}
         className="mt-3 w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
       >
-        Upload
+        Upload CSV/XLSX
       </button>
-      <a
-        href={sample}
-        download
-        className="mt-2 block text-center text-xs text-zinc-500 hover:underline"
+      <button
+        onClick={onPaste}
+        className="mt-2 w-full h-8 rounded-md border border-border text-xs font-medium hover:bg-muted"
       >
-        Download sample
-      </a>
+        Paste from Excel
+      </button>
+      <div className="mt-2 flex justify-between text-xs">
+        <a
+          href={templateHref}
+          download={templateName}
+          className="text-primary hover:underline"
+        >
+          Download template
+        </a>
+        <a
+          href={sample}
+          download
+          className="text-zinc-500 hover:underline"
+        >
+          Demo sample
+        </a>
+      </div>
     </div>
   );
 }
