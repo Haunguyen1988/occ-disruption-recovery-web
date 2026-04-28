@@ -6,21 +6,35 @@ import { GanttSchedule } from "@/components/gantt-schedule";
 import { runSimulation, type SimulationResult } from "@/lib/engine";
 import type { OptionType, RecoveryOption } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
+import { approveOption, logExport, persistSimulation } from "@/app/actions";
 
 export default function SimulatePage() {
-  const { schedule, aircraft, disruption, rules, loadSampleData } = useData();
+  const { schedule, aircraft, disruption, rules, loadSampleData, session } =
+    useData();
   const [scenario, setScenario] = useState<
     "aog" | "airport_close" | "weather" | "late_arrival"
   >("aog");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [savedUuid, setSavedUuid] = useState<string | null>(null);
+  const [savingSim, setSavingSim] = useState(false);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [approvedOptionId, setApprovedOptionId] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const canRun = Boolean(schedule.length && aircraft.length && disruption);
+  const canWrite = session?.role === "controller" || session?.role === "admin";
 
   const handleRun = () => {
     if (!disruption) return;
     setRunning(true);
+    setSavedUuid(null);
+    setApprovedOptionId(null);
+    setActionMsg(null);
+    setActionErr(null);
+    setCompareIds(new Set());
     try {
       const r = runSimulation({ schedule, aircraft, disruption, rules });
       setResult(r);
@@ -28,6 +42,60 @@ export default function SimulatePage() {
     } finally {
       setRunning(false);
     }
+  };
+
+  const handleSaveSimulation = async () => {
+    if (!result) return;
+    setSavingSim(true);
+    setActionErr(null);
+    try {
+      const r = await persistSimulation(result);
+      if (!r.ok) throw new Error(r.message);
+      setSavedUuid(r.data?.uuid ?? null);
+      setActionMsg(`Simulation saved (${r.data?.uuid ?? "?"}).`);
+    } catch (e) {
+      setActionErr((e as Error).message);
+    } finally {
+      setSavingSim(false);
+    }
+  };
+
+  const handleApprove = async (optionId: string) => {
+    if (!savedUuid) {
+      setActionErr("Save the simulation first before approving.");
+      return;
+    }
+    setActionErr(null);
+    const r = await approveOption(savedUuid, optionId);
+    if (!r.ok) {
+      setActionErr(r.message ?? "Approve failed");
+      return;
+    }
+    setApprovedOptionId(optionId);
+    setActionMsg(`Option ${optionId} approved.`);
+  };
+
+  const toggleCompare = (optionId: string) => {
+    setCompareIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(optionId)) {
+        next.delete(optionId);
+      } else if (next.size < 2) {
+        next.add(optionId);
+      }
+      return next;
+    });
+  };
+
+  const openCompare = () => {
+    if (compareIds.size !== 2 || !result) return;
+    const ids = Array.from(compareIds);
+    const payload = {
+      saved_at: new Date().toISOString(),
+      options: result.ranked_options.filter((o) => ids.includes(o.option_id)),
+    };
+    sessionStorage.setItem("occ:compare", JSON.stringify(payload));
+    window.location.href = "/dashboard/compare";
   };
 
   const handleLoadScenario = async (
@@ -93,6 +161,19 @@ export default function SimulatePage() {
 
       {result && (
         <>
+          {(actionMsg || actionErr) && (
+            <div
+              className={cn(
+                "rounded border p-3 text-sm",
+                actionErr
+                  ? "border-[color:var(--danger)] bg-red-50 text-red-800"
+                  : "border-emerald-300 bg-emerald-50 text-emerald-800",
+              )}
+            >
+              {actionErr ?? actionMsg}
+            </div>
+          )}
+
           <div className="rounded-lg border border-border p-4">
             <h2 className="font-semibold">
               Impacted flights ({result.impacted_flights.length})
@@ -119,10 +200,35 @@ export default function SimulatePage() {
           </div>
 
           <div className="rounded-lg border border-border">
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <h2 className="font-semibold">
                 Ranked recovery options ({result.ranked_options.length})
               </h2>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-zinc-500">
+                  Compare {compareIds.size}/2 selected
+                </span>
+                <button
+                  onClick={openCompare}
+                  disabled={compareIds.size !== 2}
+                  className="h-8 rounded-md border border-border px-3 text-sm hover:bg-muted disabled:opacity-40"
+                >
+                  Open compare →
+                </button>
+                {canWrite && (
+                  <button
+                    onClick={handleSaveSimulation}
+                    disabled={savingSim || Boolean(savedUuid)}
+                    className="h-8 rounded-md bg-primary px-3 text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90"
+                  >
+                    {savedUuid
+                      ? "Saved ✓"
+                      : savingSim
+                        ? "Saving…"
+                        : "Save simulation"}
+                  </button>
+                )}
+              </div>
             </div>
             <div className="divide-y divide-border">
               {result.ranked_options.map((opt) => (
@@ -130,7 +236,10 @@ export default function SimulatePage() {
                   key={opt.option_id}
                   option={opt}
                   active={selectedOption === opt.option_id}
+                  inCompare={compareIds.has(opt.option_id)}
+                  approved={approvedOptionId === opt.option_id}
                   onClick={() => setSelectedOption(opt.option_id)}
+                  onToggleCompare={() => toggleCompare(opt.option_id)}
                 />
               ))}
             </div>
@@ -144,6 +253,13 @@ export default function SimulatePage() {
               eventInfo={
                 disruption ? formatDateTime(disruption.start_time) : ""
               }
+              onApprove={
+                canWrite
+                  ? () => handleApprove(selectedOption)
+                  : undefined
+              }
+              approved={approvedOptionId === selectedOption}
+              canApprove={Boolean(savedUuid && canWrite)}
             />
           )}
         </>
@@ -164,76 +280,106 @@ const OPTION_COLORS: Record<OptionType, string> = {
 function OptionRow({
   option,
   active,
+  inCompare,
+  approved,
   onClick,
+  onToggleCompare,
 }: {
   option: RecoveryOption;
   active: boolean;
+  inCompare: boolean;
+  approved: boolean;
   onClick: () => void;
+  onToggleCompare: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       className={cn(
-        "w-full p-4 text-left grid grid-cols-12 gap-3 items-center hover:bg-muted transition",
+        "w-full p-4 grid grid-cols-12 gap-3 items-center transition",
         active && "bg-muted",
       )}
     >
-      <div className="col-span-1 text-xl font-bold">#{option.rank}</div>
-      <div className="col-span-3">
-        <span
-          className={cn(
-            "inline-block px-2 py-0.5 rounded text-[11px] font-mono text-white",
-            OPTION_COLORS[option.option_type],
+      <div className="col-span-1 flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={inCompare}
+          onChange={onToggleCompare}
+          aria-label="Add to compare"
+          className="h-4 w-4 accent-[color:var(--accent)]"
+        />
+        <span className="text-xl font-bold">#{option.rank}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="col-span-11 grid grid-cols-11 gap-3 items-center text-left hover:bg-muted/40 -mx-2 px-2 py-1 rounded"
+      >
+        <div className="col-span-3">
+          <span
+            className={cn(
+              "inline-block px-2 py-0.5 rounded text-[11px] font-mono text-white",
+              OPTION_COLORS[option.option_type],
+            )}
+          >
+            {option.option_type}
+          </span>
+          {approved && (
+            <span className="ml-2 inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-600 text-white">
+              APPROVED
+            </span>
           )}
-        >
-          {option.option_type}
-        </span>
-        <div className="mt-1 text-[11px] font-mono text-zinc-500">
-          {option.option_id}
+          <div className="mt-1 text-[11px] font-mono text-zinc-500">
+            {option.option_id}
+          </div>
         </div>
-      </div>
-      <div className="col-span-2">
-        <div className="text-xs text-zinc-500">Score</div>
-        <div className="text-lg font-semibold">{option.score}</div>
-      </div>
-      <div className="col-span-2">
-        <div className="text-xs text-zinc-500">Total / Max delay</div>
-        <div className="text-sm font-mono">
-          {option.total_delay_minutes}′ / {option.max_delay_minutes}′
+        <div className="col-span-2">
+          <div className="text-xs text-zinc-500">Score</div>
+          <div className="text-lg font-semibold">{option.score}</div>
         </div>
-      </div>
-      <div className="col-span-2">
-        <div className="text-xs text-zinc-500">Impact / Swap</div>
-        <div className="text-sm font-mono">
-          {option.impacted_flight_count} / {option.swap_count}
+        <div className="col-span-2">
+          <div className="text-xs text-zinc-500">Total / Max delay</div>
+          <div className="text-sm font-mono">
+            {option.total_delay_minutes}′ / {option.max_delay_minutes}′
+          </div>
         </div>
-      </div>
-      <div className="col-span-2">
-        <span
-          className={cn(
-            "inline-block px-2 py-0.5 rounded text-[11px] font-mono",
-            option.risk_level === "LOW" && "bg-emerald-100 text-emerald-800",
-            option.risk_level === "MEDIUM" && "bg-amber-100 text-amber-800",
-            option.risk_level === "HIGH" && "bg-red-100 text-red-800",
-          )}
-        >
-          {option.risk_level}
-        </span>
-        <div className="mt-1 text-[11px] text-zinc-500">
-          {option.recommendation}
+        <div className="col-span-2">
+          <div className="text-xs text-zinc-500">Impact / Swap</div>
+          <div className="text-sm font-mono">
+            {option.impacted_flight_count} / {option.swap_count}
+          </div>
         </div>
-      </div>
-    </button>
+        <div className="col-span-2">
+          <span
+            className={cn(
+              "inline-block px-2 py-0.5 rounded text-[11px] font-mono",
+              option.risk_level === "LOW" && "bg-emerald-100 text-emerald-800",
+              option.risk_level === "MEDIUM" && "bg-amber-100 text-amber-800",
+              option.risk_level === "HIGH" && "bg-red-100 text-red-800",
+            )}
+          >
+            {option.risk_level}
+          </span>
+          <div className="mt-1 text-[11px] text-zinc-500">
+            {option.recommendation}
+          </div>
+        </div>
+      </button>
+    </div>
   );
 }
 
 function OptionDetail({
   option,
   eventInfo,
+  onApprove,
+  approved,
+  canApprove,
 }: {
   option: RecoveryOption;
   eventInfo: string;
+  onApprove?: () => void;
+  approved: boolean;
+  canApprove: boolean;
 }) {
   return (
     <div className="rounded-lg border border-border p-4 space-y-4">
@@ -324,19 +470,41 @@ function OptionDetail({
         </div>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex gap-2 pt-2 flex-wrap">
         <button
-          onClick={() => exportOptionAsCsv(option)}
+          onClick={() => {
+            exportOptionAsCsv(option);
+            void logExport(option.option_id, "csv");
+          }}
           className="h-9 rounded-md bg-primary px-4 text-primary-foreground text-sm font-medium hover:opacity-90"
         >
           Export CSV (AIMS upload)
         </button>
         <button
-          onClick={() => exportOptionAsJson(option)}
+          onClick={() => {
+            exportOptionAsJson(option);
+            void logExport(option.option_id, "json");
+          }}
           className="h-9 rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
         >
           Export audit JSON
         </button>
+        {onApprove && (
+          <button
+            onClick={onApprove}
+            disabled={!canApprove || approved}
+            className="h-9 rounded-md bg-emerald-600 px-4 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+            title={
+              !canApprove
+                ? "Save the simulation first"
+                : approved
+                  ? "Already approved"
+                  : "Approve this option"
+            }
+          >
+            {approved ? "Approved ✓" : "Approve option"}
+          </button>
+        )}
       </div>
     </div>
   );
