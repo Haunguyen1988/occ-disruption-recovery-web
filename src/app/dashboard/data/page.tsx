@@ -25,6 +25,7 @@ export default function DataPage() {
     loadDisruptionFile,
     validation,
     parseIssues,
+    detectedFormat,
     session,
   } = useData();
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +128,16 @@ export default function DataPage() {
           </button>
         )}
       </div>
+      {detectedFormat === "aims_dayrep" && (
+        <div className="rounded border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+          <span className="font-semibold">AIMS DayRepReport detected.</span>{" "}
+          Loaded {schedule.length} flights and derived {aircraft.length}{" "}
+          aircraft from REG column. STD/STA imported as local-station HH:MM and
+          treated as naive UTC for engine math (timezone-aware handling is on
+          the roadmap).
+        </div>
+      )}
+
       {saveMsg && (
         <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           {saveMsg}

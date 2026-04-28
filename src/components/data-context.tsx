@@ -17,6 +17,7 @@ import {
   validateDataset,
   type ValidationIssue,
 } from "@/lib/parsers/csv";
+import { tryParseAimsWorkbook } from "@/lib/parsers/aims";
 import { getDefaultRules, parseRulesYaml } from "@/lib/parsers/rules";
 import type {
   Aircraft,
@@ -38,6 +39,7 @@ interface DataState {
     aircraft: ValidationIssue[];
     disruption: ValidationIssue[];
   };
+  detectedFormat: "aims_dayrep" | null;
   isLoaded: boolean;
   session: SessionInfo | null;
 }
@@ -143,6 +145,9 @@ export function DataProvider({
     aircraft: [],
     disruption: [],
   });
+  const [detectedFormat, setDetectedFormat] = useState<
+    DataState["detectedFormat"]
+  >(null);
   const seededFromServer = Boolean(
     initialSchedule?.length || initialAircraft?.length || initialDisruption,
   );
@@ -163,9 +168,22 @@ export function DataProvider({
   );
 
   const loadScheduleFile = useCallback(async (file: File) => {
+    const aims = await tryParseAimsWorkbook(file);
+    if (aims) {
+      setSchedule(aims.schedule);
+      setAircraft(aims.aircraft);
+      setDetectedFormat(aims.detectedFormat);
+      setParseIssues((p) => ({
+        ...p,
+        schedule: aims.issues,
+        aircraft: [],
+      }));
+      return;
+    }
     const rows = await parseCsvOrXlsx(file);
     const { data, issues } = parseScheduleRows(rows);
     setSchedule(data);
+    setDetectedFormat(null);
     setParseIssues((p) => ({ ...p, schedule: issues }));
   }, []);
 
@@ -219,6 +237,7 @@ export function DataProvider({
     setAircraft([]);
     setDisruption(null);
     setParseIssues({ schedule: [], aircraft: [], disruption: [] });
+    setDetectedFormat(null);
     setIsLoaded(false);
   }, []);
 
@@ -245,6 +264,7 @@ export function DataProvider({
       rulesYaml,
       validation,
       parseIssues,
+      detectedFormat,
       isLoaded,
       session,
       loadScheduleFile,
@@ -263,6 +283,7 @@ export function DataProvider({
       rulesYaml,
       validation,
       parseIssues,
+      detectedFormat,
       isLoaded,
       session,
       loadScheduleFile,
