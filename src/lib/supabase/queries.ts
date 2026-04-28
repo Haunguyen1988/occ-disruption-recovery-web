@@ -222,6 +222,7 @@ export async function getSimulation(uuid: string): Promise<SimulationDetail | nu
     max_delay_minutes: number | null;
     impacted_flight_count: number | null;
     swap_count: number | null;
+    curfew_violations: number | null;
     recommendation: string | null;
     reason_codes: string[] | null;
     score_breakdown: Record<string, number> | null;
@@ -240,6 +241,7 @@ export async function getSimulation(uuid: string): Promise<SimulationDetail | nu
       max_delay_minutes: o.max_delay_minutes ?? 0,
       impacted_flight_count: o.impacted_flight_count ?? 0,
       swap_count: o.swap_count ?? 0,
+      curfew_violations: o.curfew_violations ?? 0,
       recommendation: o.recommendation ?? "",
       reason_codes: o.reason_codes ?? [],
       score_breakdown: o.score_breakdown ?? {},

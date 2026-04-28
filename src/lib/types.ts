@@ -69,6 +69,8 @@ export interface CandidateAircraft {
 export interface FlightChange {
   flight_id: string;
   flight_number: string;
+  origin: string;
+  destination: string;
   original_aircraft: string;
   new_aircraft: string;
   original_std: Date;
@@ -88,6 +90,7 @@ export interface RecoveryOption {
   max_delay_minutes: number;
   impacted_flight_count: number;
   swap_count: number;
+  curfew_violations: number;
   risk_level: RiskLevel;
   score: number;
   rank: number | null;

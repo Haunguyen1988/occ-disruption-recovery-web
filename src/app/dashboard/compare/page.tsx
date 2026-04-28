@@ -128,6 +128,12 @@ export default function ComparePage() {
             />
             <Row label="Swaps" a={a.swap_count} b={b.swap_count} delta />
             <Row
+              label="Curfew violations"
+              a={a.curfew_violations}
+              b={b.curfew_violations}
+              delta
+            />
+            <Row
               label="Flight changes"
               a={a.flight_changes.length}
               b={b.flight_changes.length}
