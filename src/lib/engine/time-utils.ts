@@ -42,8 +42,14 @@ const VN_DEFAULT_UTC_OFFSET_HOURS = 7;
  * UTC offset (hours) for known airports. VN airports default to UTC+7.
  * Extend this map as the schedule covers more regions; unknown IATA codes
  * fall back to VN_DEFAULT_UTC_OFFSET_HOURS so curfew checks degrade safely.
+ *
+ * DST is intentionally ignored — using standard offsets matches the AIMS
+ * DayRep convention (which prints local-station time without DST flagging)
+ * and is conservative for curfew checks (off by at most ±1h on AU/RU during
+ * summer). Update entries when AIMS schedule expands to new regions.
  */
 const AIRPORT_UTC_OFFSETS: Record<string, number> = {
+  // Vietnam (UTC+7)
   HAN: 7,
   SGN: 7,
   DAD: 7,
@@ -63,6 +69,55 @@ const AIRPORT_UTC_OFFSETS: Record<string, number> = {
   THD: 7,
   DIN: 7,
   TBB: 7,
+  PXU: 7, // Pleiku
+  VII: 7, // Vinh
+  // Thailand (UTC+7)
+  BKK: 7,
+  HKT: 7,
+  // Indonesia
+  CGK: 7, // Jakarta
+  DPS: 8, // Bali
+  // Laos (UTC+7)
+  VTE: 7,
+  // Russia (no DST, varies)
+  OVB: 7, // Novosibirsk
+  KJA: 7, // Krasnoyarsk
+  NOZ: 7, // Novokuznetsk
+  KHV: 10, // Khabarovsk
+  // Singapore / Malaysia / China / HK / Macau / Philippines / Taiwan (UTC+8)
+  SIN: 8,
+  KUL: 8,
+  HKG: 8,
+  MFM: 8,
+  MNL: 8,
+  CEB: 8,
+  TPE: 8,
+  RMQ: 8,
+  KHH: 8,
+  CAN: 8,
+  PVG: 8,
+  PKX: 8,
+  HGH: 8,
+  KWL: 8,
+  ENH: 8,
+  TXN: 8,
+  // Korea / Japan (UTC+9)
+  ICN: 9,
+  PUS: 9,
+  NRT: 9,
+  HND: 9,
+  KIX: 9,
+  NGO: 9,
+  FSZ: 9,
+  FUK: 9,
+  HIJ: 9,
+  // Australia (UTC+10 standard, DST not modeled)
+  SYD: 10,
+  MEL: 10,
+  // India (UTC+5:30)
+  BOM: 5.5,
+  DEL: 5.5,
+  AMD: 5.5,
 };
 
 export function getAirportUtcOffsetHours(airport: string): number {
