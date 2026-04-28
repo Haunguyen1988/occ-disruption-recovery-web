@@ -93,7 +93,8 @@ function isInternationalRoute(origin: string, destination: string): boolean {
   // KHH, HGH, OVB, PUS, VTE) are caught by exclusion of the known VN set.
   const VN = new Set([
     "HAN", "SGN", "DAD", "CXR", "PQC", "VCL", "VCS", "BMV", "HUI", "HPH",
-    "VCA", "UIH", "VKG", "VDH", "DLI", "VDO", "THD", "DIN", "TBB",
+    "VCA", "UIH", "VKG", "VDH", "DLI", "VDO", "THD", "DIN", "TBB", "PXU",
+    "VII",
   ]);
   return !VN.has(origin) || !VN.has(destination);
 }

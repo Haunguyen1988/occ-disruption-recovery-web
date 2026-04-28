@@ -89,6 +89,10 @@ airport_rules:
   enforce_closure_window: true
   reopen_buffer_minutes: 30
   enforce_curfew: true
+  curfews:
+    PQC: { start: "23:00", end: "05:00" }
+    VCL: { start: "22:00", end: "06:00" }
+    VCS: { start: "22:00", end: "06:00" }
 
 maintenance_rules:
   prohibit_swap_if_next_check_risk: true
