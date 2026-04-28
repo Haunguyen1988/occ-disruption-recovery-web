@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+EVT-HAN-CLS-001,AIRPORT_CLOSE,,HAN,,2026-04-28T14:00:00,2026-04-28T18:00:00,HIGH,HAN airport closed due weather/runway restriction

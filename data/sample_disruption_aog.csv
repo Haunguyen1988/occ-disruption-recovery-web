@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+EVT-AOG-001,AOG,VJ-A321,,FL003,2026-04-28T12:10:00,2026-04-28T16:00:00,HIGH,AOG VJ-A321 at SGN after arrival from HAN, estimated release 16:00

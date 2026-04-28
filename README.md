@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OCC Disruption Recovery — Web
 
-## Getting Started
+Next.js + Supabase + Vercel re-platform of the OCC Disruption Recovery MVP. Designed for small (~10 user) airline OCC internal demo.
 
-First, run the development server:
+> Live demo target: **Vercel** · DB: **Supabase Postgres** · Engine: **TypeScript** · UI: **Next.js 16 App Router + Tailwind**
+
+---
+
+## Features (Sprint 1 + 2)
+
+- **Schedule overview**: Gantt-style rotation timeline (one row per aircraft).
+- **Disruption simulation**: 4 IROPS scenarios — AOG, Airport Close, Weather, Late Arrival — with ranked recovery options:
+  - `DELAY_ONLY` (impacted-aircraft scoped — bug fix vs Python MVP K2)
+  - `SPREAD_DELAY`
+  - `DEEP_DELAY`
+  - `SINGLE_SWAP` (with downstream rotation re-assignment — bug fix K4)
+- **AOG impact detector**: only flights overlapping the AOG window or starting during it are auto-impacted (bug fix K1).
+- **METAR / TAF decoder**: structured fields + alerts when below configured minima.
+- **NOTAM Q-line decoder**: extracts FIR/airport/Q-code/start/end + categorises into RUNWAY_CLOSED / AERODROME_CLOSED / NAVAID / etc.
+- **YAML-driven business rules** (turnaround, swap policy, score weights, curfew, priorities) — editable in-app.
+- **CSV / Excel** ingestion + AIMS-style CSV export of approved option.
+- **Supabase** auth + 7-table schema + RLS policies (controllers can write, viewers read).
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind v4 |
+| Auth + DB | Supabase |
+| Parsing | papaparse, xlsx, yaml |
+| Hosting | Vercel |
+
+## Running locally
 
 ```bash
+# 1. Install deps
+npm install
+
+# 2. Configure env (optional — app runs in stub mode without Supabase)
+cp .env.example .env.local
+# fill in NEXT_PUBLIC_SUPABASE_URL / ANON_KEY
+
+# 3. Dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The dashboard auto-loads sample AOG data so the demo works immediately even without Supabase.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase setup (when ready)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a free project at https://supabase.com (region: Singapore for VN users).
+2. Run the SQL in `supabase/migrations/0001_init.sql` (paste in SQL Editor).
+3. Settings → API → copy `Project URL`, `anon public key`, `service_role key` into `.env.local`.
+4. (Optional) Add team users via Supabase Auth dashboard. Default role is `viewer`. Update profile rows to `controller` / `admin` for write access.
 
-## Learn More
+## Deploy to Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Push to GitHub.
+2. https://vercel.com/new → Import the repo.
+3. Add env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+4. Deploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Roadmap
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Sprint 1 (this PR): scaffold, engine port, schedule Gantt, disruption simulation, decoders, sample data.
+- Sprint 2: Supabase persistence, audit log, what-if compare 2 options side-by-side.
+- Sprint 3: NOTAM batch ingest, METAR scheduled fetch, multi-event simulation.
+- Sprint 4: SWAP_CHAIN, CANCEL_OR_FERRY options; preliminary curfew enforcement.
+- Phase 3+: crew (FDP) and pax reaccommodation (out of scope for demo).
 
-## Deploy on Vercel
+## Project structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/                  # Next.js App Router pages
+│   ├── dashboard/        # /dashboard/* — sidebar layout
+│   │   ├── audit/
+│   │   ├── data/
+│   │   ├── decoders/
+│   │   ├── rules/
+│   │   ├── schedule/
+│   │   └── simulate/
+│   ├── login/
+│   └── page.tsx          # landing
+├── components/           # UI primitives + DataProvider
+├── lib/
+│   ├── decoders/         # METAR, NOTAM
+│   ├── engine/           # impact detector, candidate finder, delay sim, scorer
+│   ├── parsers/          # CSV / Excel / YAML
+│   ├── supabase/         # server + browser clients
+│   ├── types.ts
+│   └── utils.ts
+data/                     # default rules + sample CSVs
+public/                   # served sample CSVs (downloadable)
+supabase/migrations/      # SQL migrations
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Acknowledgements
+
+Engine logic ported from the original Python MVP (FastAPI + Streamlit). Bug fixes referenced as `K1`/`K2`/`K4` correspond to the review document `OCC_Disruption_Recovery_Review.md`.

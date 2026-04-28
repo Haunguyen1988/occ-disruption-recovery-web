@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+EVT-LA-001,LATE_ARRIVAL,VJ-A321,,FL001,2026-04-28T09:10:00,2026-04-28T11:10:00,MEDIUM,Flight FL001 late arrival by 120 minutes

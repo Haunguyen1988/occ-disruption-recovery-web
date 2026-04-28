@@ -1,0 +1,230 @@
+import type {
+  DisruptionEvent,
+  FlightChange,
+  FlightLeg,
+  ImpactedFlight,
+  OccRules,
+  RecoveryOption,
+} from "@/lib/types";
+import {
+  addMinutes,
+  minTurnaroundForType,
+  minutesBetween,
+} from "./time-utils";
+
+function randomId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function flightChangeFromDelay(
+  flight: FlightLeg,
+  delayMinutes: number,
+  reason: string,
+): FlightChange {
+  return {
+    flight_id: flight.flight_id,
+    flight_number: flight.flight_number,
+    original_aircraft: flight.aircraft_id,
+    new_aircraft: flight.aircraft_id,
+    original_std: flight.std,
+    original_sta: flight.sta,
+    new_std: addMinutes(flight.std, delayMinutes),
+    new_sta: addMinutes(flight.sta, delayMinutes),
+    delay_minutes: Math.max(0, delayMinutes),
+    reason,
+  };
+}
+
+function recalculateMetrics(option: RecoveryOption): void {
+  option.total_delay_minutes = option.flight_changes.reduce(
+    (sum, c) => sum + Math.max(0, c.delay_minutes),
+    0,
+  );
+  option.max_delay_minutes = option.flight_changes.length
+    ? Math.max(...option.flight_changes.map((c) => Math.max(0, c.delay_minutes)))
+    : 0;
+  option.impacted_flight_count = option.flight_changes.filter(
+    (c) => c.delay_minutes > 0 || c.original_aircraft !== c.new_aircraft,
+  ).length;
+  option.swap_count = Object.keys(option.aircraft_changes).length;
+}
+
+/**
+ * Bug fix K2: only propagate delay through the rotation(s) of impacted aircraft,
+ * not all aircraft in the schedule. This produces operationally realistic
+ * total/max delay numbers.
+ */
+export function simulateDelayOnly(
+  impacted: ImpactedFlight[],
+  disruption: DisruptionEvent,
+  schedule: FlightLeg[],
+  rules: OccRules,
+): RecoveryOption {
+  const impactedIds = new Set(impacted.map((i) => i.flight.flight_id));
+  const impactedAircraftIds = new Set(
+    impacted.map((i) => i.flight.aircraft_id),
+  );
+  const changes: FlightChange[] = [];
+
+  for (const acId of [...impactedAircraftIds].sort()) {
+    const rotation = schedule
+      .filter((f) => f.aircraft_id === acId)
+      .sort((a, b) => a.std.getTime() - b.std.getTime());
+    let previousNewSta: Date | null = null;
+    let delayCarry = 0;
+    for (const flight of rotation) {
+      if (!impactedIds.has(flight.flight_id) && delayCarry === 0) {
+        previousNewSta = flight.sta;
+        continue;
+      }
+      const minTurn = minTurnaroundForType(flight.aircraft_type, rules);
+      let requiredStd = flight.std;
+      if (impactedIds.has(flight.flight_id)) {
+        const blockEnd = addMinutes(disruption.end_time, minTurn);
+        if (blockEnd > requiredStd) requiredStd = blockEnd;
+      }
+      if (previousNewSta) {
+        const turnEnd = addMinutes(previousNewSta, minTurn);
+        if (turnEnd > requiredStd) requiredStd = turnEnd;
+      }
+      const delay = Math.max(0, minutesBetween(flight.std, requiredStd));
+      if (delay > 0 || impactedIds.has(flight.flight_id)) {
+        changes.push(
+          flightChangeFromDelay(flight, delay, "Delay-only propagation"),
+        );
+      }
+      delayCarry = delay;
+      previousNewSta = addMinutes(flight.sta, delay);
+    }
+  }
+
+  const option: RecoveryOption = {
+    option_id: randomId("OPT-DELAY"),
+    option_type: "DELAY_ONLY",
+    flight_changes: changes,
+    aircraft_changes: {},
+    total_delay_minutes: 0,
+    max_delay_minutes: 0,
+    impacted_flight_count: 0,
+    swap_count: 0,
+    risk_level: "MEDIUM",
+    score: 0,
+    rank: null,
+    recommendation: "",
+    reason_codes: [
+      "Keep original aircraft and propagate delay through impacted aircraft rotation only",
+    ],
+    score_breakdown: {},
+  };
+  recalculateMetrics(option);
+  return option;
+}
+
+export function simulateSpreadDelay(
+  impacted: ImpactedFlight[],
+  disruption: DisruptionEvent,
+  schedule: FlightLeg[],
+  rules: OccRules,
+): RecoveryOption {
+  const base = simulateDelayOnly(impacted, disruption, schedule, rules);
+  if (!base.flight_changes.length) return base;
+  const maxPerFlight =
+    rules.spread_delay_rules?.max_delay_per_flight_minutes ?? 90;
+  const avgDelay = Math.floor(
+    base.total_delay_minutes / Math.max(1, base.flight_changes.length),
+  );
+  const spreadDelay = Math.min(maxPerFlight, Math.max(0, avgDelay));
+  const changes: FlightChange[] = base.flight_changes.map((c) => {
+    const durationMs = c.original_sta.getTime() - c.original_std.getTime();
+    const newStd = addMinutes(c.original_std, spreadDelay);
+    return {
+      ...c,
+      new_std: newStd,
+      new_sta: new Date(newStd.getTime() + durationMs),
+      delay_minutes: spreadDelay,
+      reason: "Spread-delay simulation",
+    };
+  });
+  const option: RecoveryOption = {
+    ...base,
+    option_id: randomId("OPT-SPREAD"),
+    option_type: "SPREAD_DELAY",
+    flight_changes: changes,
+    risk_level: "MEDIUM",
+    reason_codes: [
+      "Distribute delay across impacted flights to reduce maximum single-flight delay",
+      "MVP spread-delay is a heuristic and requires OCC validation",
+    ],
+  };
+  recalculateMetrics(option);
+  return option;
+}
+
+export function simulateDeepDelay(
+  impacted: ImpactedFlight[],
+  disruption: DisruptionEvent,
+  _schedule: FlightLeg[],
+  rules: OccRules,
+): RecoveryOption {
+  if (!impacted.length) {
+    return {
+      option_id: randomId("OPT-DEEP"),
+      option_type: "DEEP_DELAY",
+      flight_changes: [],
+      aircraft_changes: {},
+      total_delay_minutes: 0,
+      max_delay_minutes: 0,
+      impacted_flight_count: 0,
+      swap_count: 0,
+      risk_level: "LOW",
+      score: 0,
+      rank: null,
+      recommendation: "",
+      reason_codes: ["No impacted flights"],
+      score_breakdown: {},
+    };
+  }
+  // Pick the lowest-priority flight (highest priority_level number, lowest load)
+  const sorted = [...impacted]
+    .map((i) => i.flight)
+    .sort((a, b) => {
+      if (a.priority_level !== b.priority_level)
+        return a.priority_level - b.priority_level;
+      return a.load_factor - b.load_factor;
+    });
+  const selected = sorted[sorted.length - 1];
+  const minTurn = minTurnaroundForType(selected.aircraft_type, rules);
+  const targetStd = (() => {
+    const blockEnd = addMinutes(disruption.end_time, minTurn);
+    return blockEnd > selected.std ? blockEnd : selected.std;
+  })();
+  let delay = Math.max(0, minutesBetween(selected.std, targetStd));
+  const deepLimit = rules.flat_delay_rules?.max_deep_delay_minutes ?? 360;
+  delay = Math.min(Math.max(delay, Math.floor(deepLimit * 0.5)), deepLimit);
+  const change = flightChangeFromDelay(
+    selected,
+    delay,
+    "Deep-delay selected low-priority flight",
+  );
+  const option: RecoveryOption = {
+    option_id: randomId("OPT-DEEP"),
+    option_type: "DEEP_DELAY",
+    flight_changes: [change],
+    aircraft_changes: {},
+    total_delay_minutes: 0,
+    max_delay_minutes: 0,
+    impacted_flight_count: 0,
+    swap_count: 0,
+    risk_level: delay > 180 ? "HIGH" : "MEDIUM",
+    score: 0,
+    rank: null,
+    recommendation: "",
+    reason_codes: [
+      `Select lower-priority flight ${selected.flight_number} to absorb deeper delay`,
+      "Use this option when network protection is more important than single-flight delay",
+    ],
+    score_breakdown: {},
+  };
+  recalculateMetrics(option);
+  return option;
+}
