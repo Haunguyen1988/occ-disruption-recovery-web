@@ -226,23 +226,63 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
       return;
     }
 
+    // Row-level rejection: rows that fail any of these checks are dropped
+    // from the imported set so the preview equals the eventual save set
+    // (no "imported but not saved" middle state).
+    let rowBad = false;
+
     const origin = String(r.origin ?? "").trim();
     const destination = String(r.destination ?? "").trim();
-    pushAirportIssue(issues, row, "origin", origin, "schedule");
-    pushAirportIssue(issues, row, "destination", destination, "schedule");
-
-    const priority = Number(r.priority_level ?? 3);
-    const loadFactor = Number(r.load_factor ?? 0);
-    if (Number.isNaN(priority)) {
+    if (origin && !IATA_RE.test(origin)) {
       issues.push({
-        level: "warning",
-        message: "priority_level is not numeric — defaulting to 3",
+        level: "error",
+        message: `'${origin}' is not a 3-letter IATA airport code (uppercase A-Z)`,
         row,
-        column: "priority_level",
-        value: String(r.priority_level ?? ""),
+        column: "origin",
+        value: origin,
         source: "schedule",
       });
+      rowBad = true;
     }
+    if (destination && !IATA_RE.test(destination)) {
+      issues.push({
+        level: "error",
+        message: `'${destination}' is not a 3-letter IATA airport code (uppercase A-Z)`,
+        row,
+        column: "destination",
+        value: destination,
+        source: "schedule",
+      });
+      rowBad = true;
+    }
+
+    if (sta <= std) {
+      issues.push({
+        level: "error",
+        message: `STA (${sta.toISOString()}) must be after STD (${std.toISOString()})`,
+        row,
+        column: "sta",
+        value: String(r.sta ?? ""),
+        source: "schedule",
+      });
+      rowBad = true;
+    }
+
+    const priorityRaw = r.priority_level ?? 3;
+    const priority = Number(priorityRaw);
+    if (Number.isNaN(priority)) {
+      issues.push({
+        level: "error",
+        message: "priority_level is not numeric",
+        row,
+        column: "priority_level",
+        value: String(priorityRaw),
+        source: "schedule",
+      });
+      rowBad = true;
+    }
+
+    const loadFactor = Number(r.load_factor ?? 0);
     if (Number.isNaN(loadFactor)) {
       issues.push({
         level: "warning",
@@ -253,6 +293,8 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
         source: "schedule",
       });
     }
+
+    if (rowBad) return;
 
     data.push({
       flight_id: String(r.flight_id),
@@ -523,6 +565,10 @@ export function validateDataset(input: {
         source: "dataset",
       });
     }
+    // Note: row-level sta<=std check now lives in parseScheduleRows so the
+    // bad row is dropped from the imported set; this defensive guard keeps
+    // the cross-dataset path consistent if FlightLeg objects come from
+    // somewhere other than parseScheduleRows.
     if (f.sta <= f.std) {
       issues.push({
         level: "error",
