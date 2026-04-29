@@ -92,6 +92,23 @@ describe("AIMS DayRep parser", () => {
     expect(dom!.is_international).toBe(false);
   });
 
+  it("produces unique flight_ids even on round-trip same-flight-number rotations", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    const ids = r.schedule.map((f) => f.flight_id);
+    const seen = new Set(ids);
+    expect(seen.size).toBe(ids.length);
+
+    // Spot check: flight 5068 on VN-A537 appears twice in the fixture (HAN→CXR
+    // outbound + CXR→HAN return). flight_id must include origin to disambiguate.
+    const f5068 = r.schedule.filter(
+      (f) => f.flight_number === "5068" && f.aircraft_id === "VN-A537",
+    );
+    if (f5068.length === 2) {
+      expect(f5068[0].flight_id).not.toBe(f5068[1].flight_id);
+      expect(new Set(f5068.map((f) => f.flight_id)).size).toBe(2);
+    }
+  });
+
   it("marks last leg of each rotation as is_last_flight_of_day", () => {
     const r = parseAimsDayRep(loadFixtureMatrix());
     const counts = new Map<string, number>();

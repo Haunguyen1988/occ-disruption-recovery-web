@@ -669,10 +669,25 @@ function emptyDraft(): EventDraft {
   };
 }
 
+/**
+ * Normalize an ISO-ish datetime string to UTC. If the user provided only
+ * `YYYY-MM-DDTHH:MM` or `...:SS` with no timezone designator, append `Z` so it
+ * is parsed as UTC (matches the field label "UTC, ISO 8601"). Strings that
+ * already carry `Z` or `±HH:MM` pass through unchanged.
+ */
+function normalizeIsoUtc(value: string): string {
+  const v = value.trim();
+  if (!v) return v;
+  if (/Z$/i.test(v)) return v;
+  if (/[+-]\d{2}:?\d{2}$/.test(v)) return v;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v)) return `${v}Z`;
+  return v;
+}
+
 function draftToEvent(d: EventDraft): DisruptionEvent | null {
   if (!d.start || !d.end) return null;
-  const start = new Date(d.start);
-  const end = new Date(d.end);
+  const start = new Date(normalizeIsoUtc(d.start));
+  const end = new Date(normalizeIsoUtc(d.end));
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return null;
   return {
     event_id: `WHAT-IF-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
@@ -874,29 +889,37 @@ function MultiEventPanel({
           )}
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">
-              Start (UTC)
+              Start (UTC, ISO 8601)
             </label>
             <input
-              type="datetime-local"
+              type="text"
               value={draft.start}
               onChange={(e) =>
                 onDraftChange({ ...draft, start: e.target.value })
               }
-              className="h-9 w-full rounded border border-border bg-background px-2 text-sm"
+              className="h-9 w-full rounded border border-border bg-background px-2 text-sm font-mono"
+              placeholder="2026-04-28T09:00:00Z"
             />
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Paste from ops doc, e.g. <code>2026-04-28T09:00:00Z</code>
+            </p>
           </div>
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">
-              End (UTC)
+              End (UTC, ISO 8601)
             </label>
             <input
-              type="datetime-local"
+              type="text"
               value={draft.end}
               onChange={(e) =>
                 onDraftChange({ ...draft, end: e.target.value })
               }
-              className="h-9 w-full rounded border border-border bg-background px-2 text-sm"
+              className="h-9 w-full rounded border border-border bg-background px-2 text-sm font-mono"
+              placeholder="2026-04-28T19:00:00Z"
             />
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Must be after Start. UTC only.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-zinc-500 mb-1">

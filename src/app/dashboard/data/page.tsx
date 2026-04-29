@@ -266,8 +266,11 @@ export default function DataPage() {
               </tr>
             </thead>
             <tbody>
-              {schedule.map((f) => (
-                <tr key={f.flight_id} className="border-t border-border">
+              {schedule.map((f, idx) => (
+                <tr
+                  key={`${idx}-${f.flight_id}`}
+                  className="border-t border-border"
+                >
                   <td className="p-2">{f.flight_number}</td>
                   <td className="p-2">
                     {f.origin}→{f.destination}
@@ -302,8 +305,11 @@ export default function DataPage() {
               </tr>
             </thead>
             <tbody>
-              {aircraft.map((a) => (
-                <tr key={a.aircraft_id} className="border-t border-border">
+              {aircraft.map((a, idx) => (
+                <tr
+                  key={`${idx}-${a.aircraft_id}`}
+                  className="border-t border-border"
+                >
                   <td className="p-2">{a.aircraft_id}</td>
                   <td className="p-2">{a.aircraft_type}</td>
                   <td className="p-2">{a.current_station}</td>
