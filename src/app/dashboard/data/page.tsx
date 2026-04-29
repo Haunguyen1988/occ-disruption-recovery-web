@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useData } from "@/components/data-context";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatAirportLocal, formatDateTime } from "@/lib/utils";
 import {
   persistAircraft,
   persistDisruption,
@@ -258,8 +258,8 @@ export default function DataPage() {
               <tr>
                 <th className="p-2">flight</th>
                 <th className="p-2">route</th>
-                <th className="p-2">STD</th>
-                <th className="p-2">STA</th>
+                <th className="p-2">STD (origin local)</th>
+                <th className="p-2">STA (dest local)</th>
                 <th className="p-2">aircraft</th>
                 <th className="p-2">prio</th>
                 <th className="p-2">LF</th>
@@ -275,8 +275,12 @@ export default function DataPage() {
                   <td className="p-2">
                     {f.origin}→{f.destination}
                   </td>
-                  <td className="p-2">{formatDateTime(f.std)}</td>
-                  <td className="p-2">{formatDateTime(f.sta)}</td>
+                  <td className="p-2">
+                    {formatAirportLocal(f.std, f.origin)}
+                  </td>
+                  <td className="p-2">
+                    {formatAirportLocal(f.sta, f.destination)}
+                  </td>
                   <td className="p-2">
                     {f.aircraft_id} ({f.aircraft_type})
                   </td>
@@ -298,9 +302,9 @@ export default function DataPage() {
                 <th className="p-2">id</th>
                 <th className="p-2">type</th>
                 <th className="p-2">station</th>
-                <th className="p-2">available</th>
+                <th className="p-2">available (station local)</th>
                 <th className="p-2">status</th>
-                <th className="p-2">next maint</th>
+                <th className="p-2">next maint (UTC)</th>
                 <th className="p-2">restriction</th>
               </tr>
             </thead>
@@ -313,7 +317,9 @@ export default function DataPage() {
                   <td className="p-2">{a.aircraft_id}</td>
                   <td className="p-2">{a.aircraft_type}</td>
                   <td className="p-2">{a.current_station}</td>
-                  <td className="p-2">{formatDateTime(a.available_from)}</td>
+                  <td className="p-2">
+                    {formatAirportLocal(a.available_from, a.current_station)}
+                  </td>
                   <td className="p-2">{a.status}</td>
                   <td className="p-2">
                     {a.next_maintenance_time

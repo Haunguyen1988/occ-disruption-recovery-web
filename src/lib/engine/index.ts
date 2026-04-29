@@ -158,4 +158,10 @@ export {
 } from "./delay-simulator";
 export { generateRecoveryOptions } from "./recovery-option-generator";
 export { rankRecoveryOptions, calculateRecoveryScore } from "./option-scorer";
-export { isInCurfew, getAirportUtcOffsetHours } from "./time-utils";
+export {
+  isInCurfew,
+  getAirportUtcOffsetHours,
+  getAirportTimezone,
+  localToUtc,
+  utcToLocalMinuteOfDay,
+} from "./time-utils";

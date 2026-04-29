@@ -75,7 +75,14 @@ function parseDate(value: unknown): Date {
     return new Date(epoch.getTime() + value * 86400000);
   }
   if (typeof value === "string" && value.trim()) {
-    const d = new Date(value);
+    // Ensure ISO datetimes without a timezone designator are parsed as UTC
+    // (rather than runtime-local). This makes CSV ingestion deterministic
+    // across host machines and matches the convention documented in the
+    // template (`YYYY-MM-DDTHH:MM:SSZ`).
+    const v = value.trim();
+    const isoNaive =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v);
+    const d = new Date(isoNaive ? `${v}Z` : v);
     if (!Number.isNaN(d.getTime())) return d;
   }
   throw new Error(`Cannot parse date: ${String(value)}`);
