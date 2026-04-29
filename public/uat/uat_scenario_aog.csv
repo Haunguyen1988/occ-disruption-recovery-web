@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+UAT-AOG-001,AOG,VN-A537,,,2026-04-28T05:00:00Z,2026-04-28T11:00:00Z,HIGH,UAT scenario S1: AOG VN-A537 between 12:00 and 18:00 HAN-local. Replicates the round-trip flight 5068 collision case after Sprint 7 fix.

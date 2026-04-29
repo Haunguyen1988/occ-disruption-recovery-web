@@ -1,0 +1,2 @@
+event_id,event_type,affected_aircraft,affected_airport,affected_flight_id,start_time,end_time,severity,description
+UAT-WX-001,AIRPORT_CLOSE,,HAN,,2026-04-28T15:00:00Z,2026-04-28T17:00:00Z,HIGH,UAT scenario S2: HAN closure 22:00-00:00 HAN-local (severe weather). Use as a what-if event on top of the AOG.
