@@ -176,7 +176,10 @@ function buildRow(
   }
 
   const acType = aircraftTypeFromCode(ac);
-  const flightId = `${d.iso}-${flt}-${reg}`;
+  // Include origin so round-trip pairings that reuse the same flight number
+  // on the same aircraft on the same day (e.g. flight 5068 HAN→CXR + 5068
+  // CXR→HAN) get distinct flight_ids. Pure ${date}-${flt}-${reg} collides.
+  const flightId = `${d.iso}-${flt}-${reg}-${dep}`;
 
   return {
     reg,
