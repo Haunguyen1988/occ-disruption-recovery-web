@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { FlightLeg, ImpactedFlight } from "@/lib/types";
-import { cn, formatTime } from "@/lib/utils";
+import { cn, formatTime, formatTimeAirportLocal } from "@/lib/utils";
 
 interface Props {
   schedule: FlightLeg[];
@@ -155,15 +155,17 @@ export function GanttSchedule({
         <div className="border-t border-border bg-muted p-3 text-sm font-mono">
           <span className="font-bold">{hover.flight_number}</span> ·{" "}
           {hover.origin}→{hover.destination} ·{" "}
-          {formatTime(hover.std)}/{formatTime(hover.sta)} · {hover.aircraft_id}{" "}
-          ({hover.aircraft_type}) · prio {hover.priority_level} · LF{" "}
-          {(hover.load_factor * 100).toFixed(0)}%
+          {formatTimeAirportLocal(hover.std, hover.origin)} {hover.origin} /{" "}
+          {formatTimeAirportLocal(hover.sta, hover.destination)} {hover.destination}{" "}
+          · {hover.aircraft_id} ({hover.aircraft_type}) · prio{" "}
+          {hover.priority_level} · LF {(hover.load_factor * 100).toFixed(0)}%
           {hover.is_international && " · INTL"}
           {hover.is_last_flight_of_day && " · LAST-OF-DAY"}
         </div>
       )}
 
       <div className="border-t border-border p-2 text-[11px] text-zinc-500 flex flex-wrap gap-4">
+        <span className="font-mono">Canvas: UTC · Tooltip: airport-local</span>
         <Legend color="bg-zinc-700" label="Domestic" />
         <Legend color="bg-blue-700" label="International" />
         <Legend color="bg-emerald-700" label="Last of day" />

@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { Aircraft, FlightLeg } from "@/lib/types";
 import type { ValidationIssue } from "@/lib/parsers/csv";
+import { getAirportTimezone, localToUtc } from "@/lib/engine/time-utils";
 
 // ---------------------------------------------------------------------------
 // AIMS DayRepReport ingestion
@@ -15,11 +16,10 @@ import type { ValidationIssue } from "@/lib/parsers/csv";
 //   row 6..N : data rows
 //   trailer  : "Total Record(s): N", "Generated on ..."
 //
-// All times are local-station HH:MM (per the report's own header line). For
-// engine math we promote them to ISO `YYYY-MM-DDTHH:MM:00Z` — i.e. naive UTC.
-// This matches the existing sample CSVs which also use naive datetimes; a
-// follow-up sprint can introduce true timezone-aware handling once we extend
-// `getAirportUtcOffsetHours` to cover non-VN stations in this report.
+// STD is local time at origin (DEP); STA is local time at destination (ARR).
+// We resolve both to true UTC via the airport→IANA-tz map in `time-utils`,
+// so engine math (turnaround, curfew check) is correct even on cross-tz legs
+// (e.g. HAN→ICN, where origin is UTC+7 and destination is UTC+9).
 
 const AIMS_HEADER_SIGNATURE = [
   "DATE",
@@ -58,7 +58,14 @@ function pad2(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
-function parseAimsDate(value: string): { iso: string; ms: number } | null {
+interface ParsedAimsDate {
+  iso: string;
+  year: number;
+  month: number;
+  day: number;
+}
+
+function parseAimsDate(value: string): ParsedAimsDate | null {
   // "DD/MM/YY" → "20YY-MM-DD"
   const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(value.trim());
   if (!m) return null;
@@ -67,7 +74,22 @@ function parseAimsDate(value: string): { iso: string; ms: number } | null {
   const year = 2000 + Number(m[3]);
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   const iso = `${year}-${pad2(month)}-${pad2(day)}`;
-  return { iso, ms: Date.UTC(year, month - 1, day) };
+  return { iso, year, month, day };
+}
+
+/** Advance a Y-M-D triple by `days` days, returning the new triple. */
+function addDays(
+  year: number,
+  month: number,
+  day: number,
+  days: number,
+): { year: number; month: number; day: number } {
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+  };
 }
 
 function parseHHMM(value: string): { h: number; m: number } | null {
@@ -159,21 +181,24 @@ function buildRow(
     return null;
   }
 
-  const stdIso = `${d.iso}T${pad2(stdT.h)}:${pad2(stdT.m)}:00Z`;
-  // Overnight flights: STA earlier than STD on the displayed clock means the
-  // arrival is on the next calendar day.
-  let staIso: string;
+  // STD is local at origin; STA is local at destination. Resolve both to true
+  // UTC via the airport→IANA-tz map so engine math works on cross-tz legs.
+  const originTz = getAirportTimezone(dep);
+  const destTz = getAirportTimezone(arr);
+  const stdDate = localToUtc(d.year, d.month, d.day, stdT.h, stdT.m, originTz);
+
+  // Overnight flights: when STA's displayed clock at the destination is
+  // earlier than STD's displayed clock at the origin, AIMS prints the arrival
+  // on the next destination-local day.
   const stdMin = stdT.h * 60 + stdT.m;
   const staMin = staT.h * 60 + staT.m;
-  if (staMin < stdMin) {
-    const next = new Date(d.ms + 24 * 60 * 60 * 1000);
-    const ny = next.getUTCFullYear();
-    const nm = pad2(next.getUTCMonth() + 1);
-    const nd = pad2(next.getUTCDate());
-    staIso = `${ny}-${nm}-${nd}T${pad2(staT.h)}:${pad2(staT.m)}:00Z`;
-  } else {
-    staIso = `${d.iso}T${pad2(staT.h)}:${pad2(staT.m)}:00Z`;
-  }
+  const staDate =
+    staMin < stdMin
+      ? (() => {
+          const n = addDays(d.year, d.month, d.day, 1);
+          return localToUtc(n.year, n.month, n.day, staT.h, staT.m, destTz);
+        })()
+      : localToUtc(d.year, d.month, d.day, staT.h, staT.m, destTz);
 
   const acType = aircraftTypeFromCode(ac);
   // Include origin so round-trip pairings that reuse the same flight number
@@ -189,8 +214,8 @@ function buildRow(
       flight_number: flt,
       origin: dep,
       destination: arr,
-      std: new Date(stdIso),
-      sta: new Date(staIso),
+      std: stdDate,
+      sta: staDate,
       aircraft_id: reg,
       aircraft_type: acType,
       priority_level: 3,

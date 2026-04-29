@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  getAirportTimezone,
   getAirportUtcOffsetHours,
   isInCurfew,
   localTimeOfDayMinutes,
+  localToUtc,
+  utcToLocalMinuteOfDay,
 } from "@/lib/engine/time-utils";
 import { getDefaultRules } from "@/lib/parsers/rules";
 
@@ -44,6 +47,69 @@ describe("localTimeOfDayMinutes", () => {
     // 2026-04-28T18:30:00Z → 00:00 local in BOM (+5:30)
     const utc = new Date("2026-04-28T18:30:00Z");
     expect(localTimeOfDayMinutes(utc, "BOM")).toBe(0);
+  });
+});
+
+describe("getAirportTimezone", () => {
+  it("maps known stations to IANA zones", () => {
+    expect(getAirportTimezone("HAN")).toBe("Asia/Ho_Chi_Minh");
+    expect(getAirportTimezone("SGN")).toBe("Asia/Ho_Chi_Minh");
+    expect(getAirportTimezone("ICN")).toBe("Asia/Seoul");
+    expect(getAirportTimezone("NRT")).toBe("Asia/Tokyo");
+    expect(getAirportTimezone("HKG")).toBe("Asia/Hong_Kong");
+    expect(getAirportTimezone("BOM")).toBe("Asia/Kolkata");
+    expect(getAirportTimezone("SYD")).toBe("Australia/Sydney");
+  });
+
+  it("falls back to Asia/Ho_Chi_Minh for unknown codes", () => {
+    expect(getAirportTimezone("XYZ")).toBe("Asia/Ho_Chi_Minh");
+  });
+});
+
+describe("localToUtc (DST-aware)", () => {
+  it("converts HAN local 10:30 (UTC+7) → 03:30Z", () => {
+    const utc = localToUtc(2026, 4, 28, 10, 30, "Asia/Ho_Chi_Minh");
+    expect(utc.toISOString()).toBe("2026-04-28T03:30:00.000Z");
+  });
+
+  it("converts ICN local 17:00 (UTC+9) → 08:00Z", () => {
+    const utc = localToUtc(2026, 4, 28, 17, 0, "Asia/Seoul");
+    expect(utc.toISOString()).toBe("2026-04-28T08:00:00.000Z");
+  });
+
+  it("converts BOM local 00:00 (UTC+5:30) → previous day 18:30Z", () => {
+    const utc = localToUtc(2026, 4, 28, 0, 0, "Asia/Kolkata");
+    expect(utc.toISOString()).toBe("2026-04-27T18:30:00.000Z");
+  });
+
+  it("respects Sydney DST (AEDT UTC+11 in January)", () => {
+    // 2026-01-15 12:00 AEDT (UTC+11) → 01:00Z
+    const utc = localToUtc(2026, 1, 15, 12, 0, "Australia/Sydney");
+    expect(utc.toISOString()).toBe("2026-01-15T01:00:00.000Z");
+  });
+
+  it("respects Sydney non-DST (AEST UTC+10 in July)", () => {
+    // 2026-07-15 12:00 AEST (UTC+10) → 02:00Z
+    const utc = localToUtc(2026, 7, 15, 12, 0, "Australia/Sydney");
+    expect(utc.toISOString()).toBe("2026-07-15T02:00:00.000Z");
+  });
+});
+
+describe("utcToLocalMinuteOfDay (DST-aware)", () => {
+  it("renders UTC in HKG-local clock correctly", () => {
+    const utc = new Date("2026-04-28T15:30:00Z");
+    expect(utcToLocalMinuteOfDay(utc, "HKG")).toBe(23 * 60 + 30);
+  });
+
+  it("renders UTC in BOM-local clock correctly", () => {
+    const utc = new Date("2026-04-28T18:30:00Z");
+    expect(utcToLocalMinuteOfDay(utc, "BOM")).toBe(0);
+  });
+
+  it("renders UTC in SYD-local clock during DST (AEDT UTC+11)", () => {
+    // 2026-01-15T01:30Z → 12:30 AEDT
+    const utc = new Date("2026-01-15T01:30:00Z");
+    expect(utcToLocalMinuteOfDay(utc, "SYD")).toBe(12 * 60 + 30);
   });
 });
 

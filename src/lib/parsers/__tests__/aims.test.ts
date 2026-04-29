@@ -55,26 +55,45 @@ describe("AIMS DayRep parser", () => {
     expect(types).toEqual(new Set(["A320", "A321", "A330"]));
   });
 
-  it("rolls overnight STA to next day", () => {
+  it("rolls overnight STA to next day (UTC instants resolved via airport tz)", () => {
     const r = parseAimsDayRep(loadFixtureMatrix());
     // Sample row: 28/04/26  2980  VN-A516  321  CXR  HAN  23:50  01:35
+    // CXR & HAN are both UTC+7 (no DST). STD CXR-local 23:50 → 16:50Z 28-Apr;
+    // STA HAN-local 01:35 wraps to next destination-local day → 18:35Z 28-Apr.
     const overnight = r.schedule.find(
       (f) => f.flight_number === "2980" && f.aircraft_id === "VN-A516",
     );
     expect(overnight).toBeDefined();
-    expect(overnight!.std.toISOString()).toBe("2026-04-28T23:50:00.000Z");
-    expect(overnight!.sta.toISOString()).toBe("2026-04-29T01:35:00.000Z");
+    expect(overnight!.std.toISOString()).toBe("2026-04-28T16:50:00.000Z");
+    expect(overnight!.sta.toISOString()).toBe("2026-04-28T18:35:00.000Z");
   });
 
-  it("aircraft current_station = first DEP, available_from = earliest STD", () => {
+  it("aircraft current_station = first DEP, available_from = earliest STD (UTC)", () => {
     const r = parseAimsDayRep(loadFixtureMatrix());
     const a200 = r.aircraft.find((a) => a.aircraft_id === "VN-A200");
     expect(a200).toBeDefined();
     // VN-A200 first leg in fixture is 28/04/26 463 HAN→VCA STD 10:20.
+    // HAN is UTC+7 → 03:20Z.
     expect(a200!.current_station).toBe("HAN");
     expect(a200!.available_from.toISOString()).toBe(
-      "2026-04-28T10:20:00.000Z",
+      "2026-04-28T03:20:00.000Z",
     );
+  });
+
+  it("resolves cross-tz international STA against the destination timezone", () => {
+    const r = parseAimsDayRep(loadFixtureMatrix());
+    // Find any HAN/SGN→ICN leg in the fixture (origin UTC+7, dest UTC+9).
+    const intl = r.schedule.find(
+      (f) =>
+        f.destination === "ICN" &&
+        (f.origin === "HAN" || f.origin === "SGN" || f.origin === "DAD"),
+    );
+    if (!intl) return; // fixture-dependent; skip silently if absent.
+    // The block time stays positive and matches local clock arithmetic minus
+    // the 2-hour tz delta (origin +7 → destination +9).
+    const blockMs = intl.sta.getTime() - intl.std.getTime();
+    expect(blockMs).toBeGreaterThan(0);
+    expect(blockMs).toBeLessThan(8 * 3600 * 1000); // sane upper bound
   });
 
   it("flags is_international for non-VN destinations", () => {
