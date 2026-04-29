@@ -133,8 +133,8 @@ export default function DataPage() {
           <span className="font-semibold">AIMS DayRepReport detected.</span>{" "}
           Loaded {schedule.length} flights and derived {aircraft.length}{" "}
           aircraft from REG column. STD/STA imported as local-station HH:MM and
-          treated as naive UTC for engine math (timezone-aware handling is on
-          the roadmap).
+          converted to UTC using the IANA timezone for the origin/destination
+          airport.
         </div>
       )}
 

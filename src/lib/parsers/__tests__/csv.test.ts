@@ -49,11 +49,43 @@ describe("parseScheduleRows", () => {
     expect(err?.value).toBe("not-a-date");
   });
 
-  it("warns on lowercase / 4-letter airport codes (IATA check)", () => {
-    const r = parseScheduleRows([{ ...goodRow, origin: "sgn", destination: "ABCD" }]);
-    const warnings = r.issues.filter((i) => i.level === "warning");
-    expect(warnings.some((w) => w.column === "origin" && w.value === "sgn")).toBe(true);
-    expect(warnings.some((w) => w.column === "destination" && w.value === "ABCD")).toBe(true);
+  it("rejects lowercase / 4-letter airport codes (IATA check) and drops the row", () => {
+    const r = parseScheduleRows([
+      goodRow,
+      { ...goodRow, flight_id: "FL002", origin: "sgn" },
+      { ...goodRow, flight_id: "FL003", destination: "ABCD" },
+    ]);
+    expect(r.data.map((d) => d.flight_id)).toEqual(["FL001"]);
+    const errors = r.issues.filter((i) => i.level === "error");
+    expect(errors.some((e) => e.column === "origin" && e.value === "sgn")).toBe(true);
+    expect(errors.some((e) => e.column === "destination" && e.value === "ABCD")).toBe(true);
+  });
+
+  it("rejects sta <= std at row level and drops the row", () => {
+    const r = parseScheduleRows([
+      goodRow,
+      {
+        ...goodRow,
+        flight_id: "FL002",
+        std: "2026-04-28T09:00:00Z",
+        sta: "2026-04-28T08:00:00Z",
+      },
+    ]);
+    expect(r.data.map((d) => d.flight_id)).toEqual(["FL001"]);
+    const err = r.issues.find((i) => i.column === "sta" && i.row === 3);
+    expect(err?.level).toBe("error");
+    expect(err?.message).toMatch(/must be after STD/);
+  });
+
+  it("rejects non-numeric priority_level and drops the row", () => {
+    const r = parseScheduleRows([
+      goodRow,
+      { ...goodRow, flight_id: "FL002", priority_level: "not-a-number" },
+    ]);
+    expect(r.data.map((d) => d.flight_id)).toEqual(["FL001"]);
+    const err = r.issues.find((i) => i.column === "priority_level");
+    expect(err?.level).toBe("error");
+    expect(err?.value).toBe("not-a-number");
   });
 
   it("does not block the whole file on one bad row", () => {
@@ -63,6 +95,35 @@ describe("parseScheduleRows", () => {
       { ...goodRow, flight_id: "FL003" },
     ]);
     expect(r.data.map((d) => d.flight_id)).toEqual(["FL001", "FL003"]);
+  });
+
+  it("matches the UAT broken-schedule fixture: 4 BAD rows dropped, 2 OK rows kept", () => {
+    // Mirror of public/uat/uat_scenario_broken_schedule.csv — anchors the
+    // smoke-test expectation that preview = save set (no \"imported with
+    // warnings\" middle state).
+    const rows = [
+      { ...goodRow, flight_id: "UAT-OK-001", flight_number: "VJ900" },
+      { ...goodRow, flight_id: "UAT-BAD-001", flight_number: "VJ901", origin: "sgn" },
+      { ...goodRow, flight_id: "UAT-BAD-002", flight_number: "VJ902", std: "not-a-date" },
+      {
+        ...goodRow,
+        flight_id: "UAT-BAD-003",
+        flight_number: "VJ903",
+        std: "2026-04-28T09:00:00Z",
+        sta: "2026-04-28T08:00:00Z",
+      },
+      {
+        ...goodRow,
+        flight_id: "UAT-BAD-004",
+        flight_number: "VJ904",
+        priority_level: "not-a-number",
+      },
+      { ...goodRow, flight_id: "UAT-OK-002", flight_number: "VJ905" },
+    ];
+    const r = parseScheduleRows(rows);
+    expect(r.data.map((d) => d.flight_id)).toEqual(["UAT-OK-001", "UAT-OK-002"]);
+    const errors = r.issues.filter((i) => i.level === "error");
+    expect(errors.length).toBeGreaterThanOrEqual(4);
   });
 });
 
