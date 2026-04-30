@@ -6,9 +6,10 @@
 **Fixtures:** `public/uat/*` and `src/lib/parsers/__tests__/fixtures/aims_dayrep_sample.xlsx` (real AIMS DayRep, 28-Apr-2026, 325 flights).
 
 > **Pre-flight (1 day before UAT)**
-> 1. Run `supabase/migrations/0001_init.sql` and `0002_curfew_and_multi_event.sql` against the UAT Supabase project.
+> 1. Run `supabase/migrations/0001_init.sql`, `0002_curfew_and_multi_event.sql`, and `0003_approval_safety.sql` against the UAT Supabase project in order.
 > 2. Run `docs/uat/uat_seed.sql` to provision UAT users (`uat-controller@vietjet.com`, `uat-supervisor@vietjet.com`, `uat-viewer@vietjet.com`) and assign roles.
-> 3. Confirm `<UAT_URL>` is reachable, `/login` works, and the AIMS DayRep upload returns the blue "Loaded 325 flights / 73 aircraft" banner.
+> 3. Run `docs/uat/uat_preflight_check.sql` and make sure every schema check returns `OK`, while every UAT user row returns `OK`.
+> 4. Confirm `<UAT_URL>` is reachable, `/login` works, and the AIMS DayRep upload returns the blue "Loaded 325 flights / 73 aircraft" banner.
 
 ---
 

@@ -10,6 +10,7 @@ import type {
   RecoveryOption,
 } from "@/lib/types";
 import type { SimulationResult } from "@/lib/engine";
+import { approveRecoveryOptionAtomic } from "@/lib/supabase/approval";
 
 export interface ActionResult<T = unknown> {
   ok: boolean;
@@ -217,29 +218,11 @@ export async function approveOption(
   if (!auth.ok) return { ok: false, message: auth.message };
   const supabase = await createSupabaseServerClient();
 
-  const { data: sim } = await supabase
-    .from("simulations")
-    .select("id")
-    .eq("uuid", simulationUuid)
-    .maybeSingle();
-  if (!sim) return { ok: false, message: "Simulation not found" };
-
-  // Reset previous approval on the same simulation, then set new one
-  await supabase
-    .from("recovery_options")
-    .update({ approved: false, approved_by: null, approved_at: null })
-    .eq("simulation_id", sim.id);
-
-  const { error } = await supabase
-    .from("recovery_options")
-    .update({
-      approved: true,
-      approved_by: auth.user_id,
-      approved_at: new Date().toISOString(),
-    })
-    .eq("simulation_id", sim.id)
-    .eq("option_id", optionId);
-  if (error) return { ok: false, message: error.message };
+  const approval = await approveRecoveryOptionAtomic(supabase, {
+    simulationUuid,
+    optionId,
+  });
+  if (!approval.ok) return { ok: false, message: approval.message };
 
   await logAuditServer({
     user_id: auth.user_id!,

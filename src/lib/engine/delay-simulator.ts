@@ -11,6 +11,11 @@ import {
   minTurnaroundForType,
   minutesBetween,
 } from "./time-utils";
+import {
+  getAircraftRotation,
+  resolveScheduleIndex,
+  type ScheduleIndex,
+} from "./schedule-index";
 
 function randomId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -61,7 +66,9 @@ export function simulateDelayOnly(
   disruption: DisruptionEvent,
   schedule: FlightLeg[],
   rules: OccRules,
+  scheduleIndex?: ScheduleIndex,
 ): RecoveryOption {
+  const index = resolveScheduleIndex(schedule, scheduleIndex);
   const impactedIds = new Set(impacted.map((i) => i.flight.flight_id));
   const impactedAircraftIds = new Set(
     impacted.map((i) => i.flight.aircraft_id),
@@ -69,9 +76,7 @@ export function simulateDelayOnly(
   const changes: FlightChange[] = [];
 
   for (const acId of [...impactedAircraftIds].sort()) {
-    const rotation = schedule
-      .filter((f) => f.aircraft_id === acId)
-      .sort((a, b) => a.std.getTime() - b.std.getTime());
+    const rotation = getAircraftRotation(index, acId);
     let previousNewSta: Date | null = null;
     let delayCarry = 0;
     for (const flight of rotation) {
@@ -123,41 +128,137 @@ export function simulateDelayOnly(
   return option;
 }
 
+/**
+ * Buffer-aware spread delay (S2 upgrade).
+ *
+ * Instead of applying an averaged flat delay to every flight, this algorithm:
+ * 1. Forward-propagates delay through the rotation (like DELAY_ONLY).
+ * 2. Caps each individual flight's delay at `max_delay_per_flight_minutes`.
+ * 3. If a cap forces a turnaround violation on the next leg, that leg's delay
+ *    is increased just enough to satisfy the constraint.
+ *
+ * The result is a schedule where no single flight absorbs excessive delay
+ * while still respecting turnaround and station-continuity constraints.
+ */
 export function simulateSpreadDelay(
   impacted: ImpactedFlight[],
   disruption: DisruptionEvent,
   schedule: FlightLeg[],
   rules: OccRules,
+  scheduleIndex?: ScheduleIndex,
 ): RecoveryOption {
-  const base = simulateDelayOnly(impacted, disruption, schedule, rules);
-  if (!base.flight_changes.length) return base;
+  const index = resolveScheduleIndex(schedule, scheduleIndex);
+  const impactedIds = new Set(impacted.map((i) => i.flight.flight_id));
+  const impactedAircraftIds = new Set(
+    impacted.map((i) => i.flight.aircraft_id),
+  );
   const maxPerFlight =
     rules.spread_delay_rules?.max_delay_per_flight_minutes ?? 90;
-  const avgDelay = Math.floor(
-    base.total_delay_minutes / Math.max(1, base.flight_changes.length),
-  );
-  const spreadDelay = Math.min(maxPerFlight, Math.max(0, avgDelay));
-  const changes: FlightChange[] = base.flight_changes.map((c) => {
-    const durationMs = c.original_sta.getTime() - c.original_std.getTime();
-    const newStd = addMinutes(c.original_std, spreadDelay);
-    return {
-      ...c,
-      new_std: newStd,
-      new_sta: new Date(newStd.getTime() + durationMs),
-      delay_minutes: spreadDelay,
-      reason: "Spread-delay simulation",
-    };
-  });
+
+  if (!impacted.length) {
+    return simulateDelayOnly(impacted, disruption, schedule, rules, index);
+  }
+
+  const changes: FlightChange[] = [];
+
+  for (const acId of [...impactedAircraftIds].sort()) {
+    const rotation = getAircraftRotation(index, acId);
+
+    // Pass 1: compute unconstrained delays (same as DELAY_ONLY)
+    const legInfos: Array<{
+      flight: FlightLeg;
+      unconstrainedDelay: number;
+      isImpacted: boolean;
+    }> = [];
+    let prevNewSta: Date | null = null;
+    let delayCarry = 0;
+    for (const flight of rotation) {
+      if (!impactedIds.has(flight.flight_id) && delayCarry === 0) {
+        prevNewSta = flight.sta;
+        continue;
+      }
+      const minTurn = minTurnaroundForType(flight.aircraft_type, rules);
+      let requiredStd = flight.std;
+      if (impactedIds.has(flight.flight_id)) {
+        const blockEnd = addMinutes(disruption.end_time, minTurn);
+        if (blockEnd > requiredStd) requiredStd = blockEnd;
+      }
+      if (prevNewSta) {
+        const turnEnd = addMinutes(prevNewSta, minTurn);
+        if (turnEnd > requiredStd) requiredStd = turnEnd;
+      }
+      const delay = Math.max(0, minutesBetween(flight.std, requiredStd));
+      legInfos.push({
+        flight,
+        unconstrainedDelay: delay,
+        isImpacted: impactedIds.has(flight.flight_id),
+      });
+      delayCarry = delay;
+      prevNewSta = addMinutes(flight.sta, delay);
+    }
+
+    if (legInfos.length === 0) continue;
+
+    // Pass 2: cap each leg at maxPerFlight
+    const delays = legInfos.map((li) =>
+      Math.min(li.unconstrainedDelay, maxPerFlight),
+    );
+
+    // Pass 3: forward fix — ensure turnaround feasibility after capping
+    let pSta: Date | null = null;
+    for (let i = 0; i < legInfos.length; i++) {
+      const fl = legInfos[i].flight;
+      const newStd = addMinutes(fl.std, delays[i]);
+      if (pSta) {
+        const minTurn = minTurnaroundForType(fl.aircraft_type, rules);
+        const turnEnd = addMinutes(pSta, minTurn);
+        if (turnEnd > newStd) {
+          delays[i] = Math.max(
+            delays[i],
+            minutesBetween(fl.std, turnEnd),
+          );
+        }
+      }
+      pSta = addMinutes(fl.sta, delays[i]);
+    }
+
+    // Generate flight changes
+    for (let i = 0; i < legInfos.length; i++) {
+      const li = legInfos[i];
+      const delay = delays[i];
+      if (delay > 0 || li.isImpacted) {
+        changes.push(
+          flightChangeFromDelay(
+            li.flight,
+            delay,
+            delay < li.unconstrainedDelay
+              ? "Buffer-aware spread delay (capped)"
+              : "Buffer-aware spread delay",
+          ),
+        );
+      }
+    }
+  }
+
   const option: RecoveryOption = {
-    ...base,
     option_id: randomId("OPT-SPREAD"),
     option_type: "SPREAD_DELAY",
     flight_changes: changes,
+    aircraft_changes: {},
+    total_delay_minutes: 0,
+    max_delay_minutes: 0,
+    impacted_flight_count: 0,
+    swap_count: 0,
+    curfew_violations: 0,
     risk_level: "MEDIUM",
+    score: 0,
+    rank: null,
+    recommendation: "",
     reason_codes: [
-      "Distribute delay across impacted flights to reduce maximum single-flight delay",
-      "MVP spread-delay is a heuristic and requires OCC validation",
+      "Buffer-aware spread delay: caps per-flight delay and uses natural gaps to absorb excess",
+      `Per-flight cap: ${maxPerFlight}min; turnaround constraints enforced`,
     ],
+    score_breakdown: {},
   };
   recalculateMetrics(option);
   return option;
@@ -188,13 +289,15 @@ export function simulateDeepDelay(
       score_breakdown: {},
     };
   }
-  // Pick the lowest-priority flight (highest priority_level number, lowest load)
+  // Pick the lowest-priority flight to sacrifice: highest priority_level
+  // number (since 1=HIGH, 3=LOW), and among equals the lowest load_factor.
   const sorted = [...impacted]
     .map((i) => i.flight)
     .sort((a, b) => {
       if (a.priority_level !== b.priority_level)
         return a.priority_level - b.priority_level;
-      return a.load_factor - b.load_factor;
+      // Descending load so lowest load ends up last → selected for sacrifice
+      return b.load_factor - a.load_factor;
     });
   const selected = sorted[sorted.length - 1];
   const minTurn = minTurnaroundForType(selected.aircraft_type, rules);

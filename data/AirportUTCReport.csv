@@ -1,0 +1,1305 @@
+,,Airport UTC Dates
+,,Sorted By Airport Code
+"Country
+ Code",Country Name,IATA,ICAO,Airport Name,Terminals,Time Zone and DST Variation,"Alternate Airports
+and Distances","Co
+ Term.",Frequences,"Longtitude
+ Latitude","Dep Tolerance
+ Arr Tolerance"
+LT,TURKEY,ADA ,LTAF,ADANA,,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E035164900  
+N36585600   ",
+Y ,AUSTRALIA,ADL ,YPAD,"ADELAIDE INTL,SA",,"(3) 
++09:30 ,DST +10:30 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"124.200
+120.500","E138315000  
+S34564200   ",
+NZ,NEW ZEALAND,AKL ,NZAA,AUCKLAND INTL,,"(1) 
++12:00 ,DST +13:00 9/27/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"
+","E174473000  
+S37002900   ",
+UA,KAZAKHSTAN,ALA ,UAAA,ALMATY,,"(1) 
++05:00 ,DST not applied","CIT - FRU -  - 
+378 - 133 -  - ",,"
+","E077024100  
+N43211900   ",
+V ,INDIA,AMD ,VAAH,AHMEDABAD,,"(1) 
++05:30 ,DST not applied","JAI - BOM -  - 
+296 - 310 -  - ",,"119.80
+118.10","E072373515  
+N23041628   ",
+EH,NETHERLANDS,AMS ,EHAM,"AMSTERDAM,SCHIPHOL",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E004455100  
+N52182900   ",
+K ,UNITED STATES,ANC ,PANC,"STEVENS ANCHORAGE INTL,AK",2,"(5) 
+-09:00 ,DST -08:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"118.600
+118.300","W149594690  
+N61102770   ",
+R ,JAPAN,AOJ ,RJSA,AOMORI,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E140411900  
+N40440000   ",
+Y ,AUSTRALIA,ASP ,YBAS,Alice Springs Airport,,"(3) 
++09:30 ,DST +10:30 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"
+","E133540800  
+S23482500   ",
+LG,GREECE,ATH ,LGAV,"ATHENS, VENIZELOS INTL",,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E023564020  
+N37561212   ",
+V ,INDIA,ATQ ,VIAR,AMRITSAR,1,"(1) 
++05:30 ,DST not applied","DEL -  -  - 
+293 -  -  - ",,"121.15
+118.15","E074480750  
+N31421600   ",
+Y ,AUSTRALIA,AVV ,YMAV,"AVALON,VI",,"(2) 
++10:00 ,DST +11:00 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"133.55
+120.100","E144281000  
+S38022200   ",
+OM,UNITED ARAB EMIRATES,AZI ,OMAD,ABU DHABI AL BATEEN,,"(1) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E054272900  
+N24254200   ",
+Z ,CHINA,BAV ,    ,BAOTOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E10959000   
+N4004000    ",
+U ,RUSSIAN FEDERATION,BAX ,UNBB,Barnaul Gherman Titov,,"(5) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E083323000  
+N53214800   ",
+K ,UNITED STATES,BFI ,KBFI,"SEATTLE,WA,BOEING FIELD  KING CO INTL",,"(4) 
+-08:00 ,DST -07:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"
+","W122180710  
+N47314800   ",
+MH,HONDURAS,BII ,    ,BIKINI ATOLL,,"(1) 
+-06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E16533000   
+N1103000    ",
+VT,THAILAND,BKK ,VTBS,BANGKOK INTL,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.750
+118.200","E100445600  
+N13410900   ",
+V ,INDIA,BLR ,VOBL,BANGALORE,,"(1) 
++05:30 ,DST not applied","HYD - MAA -  - 
+245 - 145 -  - ",,"
+","E077395250  
+N12570780   ",
+VV,VIETNAM,BMV ,VVBM,BUON MA THUOT,,"(1) 
++07:00 ,DST not applied","SGN - CXR -  - 
+265 - 152 -  - ",,"
+118.450","E108060000  
+N12040000   ",
+Y ,AUSTRALIA,BNE ,YBBN,"BRISBANE INTL,QL",,"(2) 
++10:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"123.500
+120.500","E153070300  
+S27230300   ",
+V ,INDIA,BOM ,VABB,"MUMBAI,CHHATRAPATI SHIVAJI INTL",3,"(1) 
++05:30 ,DST not applied","HYD - AMD -  - 
+370 - 259 -  - ",,"119.30
+122.50","E072515800  
+N19053000   ",
+U ,RUSSIAN FEDERATION,BQS ,UHBB,"BLAGOVESCHENSK,IGNATYEVO",,"(7) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E127244200  
+N50253000   ",
+W ,INDONESIA,BTH ,WIKB,Bandar Udara Internasional Hang Nadim,1,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.75
+130.2","E104065000  
+N01070700   ",
+V ,INDIA,BWA ,VNBW,Gautam Buddha International Airport,,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E083250500  
+N27302600   ",
+WB,BRUNEI DARUSSALAM,BWN ,WBSB,"BANDAR SERI BEGAWAN,BRUNEI INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E114554000  
+N04564400   ",
+Z ,CHINA,CAN ,ZGGG,"GUANGZHOU,BAIYUN",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113182400  
+N23232400   ",
+Y ,AUSTRALIA,CBR ,YSCB,"CANBERRA,AC",,"(2) 
++10:00 ,DST +11:00 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"
+","E149114200  
+S35182500   ",
+V ,INDIA,CCU ,VECC,"KOLKATA,NETAJI SUBHASH CHANDRA BOSE IN",3,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"119.30
+118.02","E088264818  
+N22391420   ",
+LF,FRANCE,CDG ,LFPG,"PARIS, CHARLES DE GAULLE",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E002325215  
+N49003509   ",
+RP,PHILIPPINES,CEB ,RPVM,"MACTAN, CEBU INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1235845 9  
+N103059 4   ",
+VT,THAILAND,CEI ,VTCT,CHIANG RAI INTL,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"120.05
+118.4","E099525900  
+N19570800   ",
+W ,INDONESIA,CGK ,WIII,"JAKARTA,SOEKARNO  HATTA INTL",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.600
+118.200","E106394000  
+S06072500   ",
+Z ,CHINA,CGO ,ZHCC,"ZHENGZHOU,XINZHENG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113503000  
+N34310600   ",
+Z ,CHINA,CGQ ,ZYCC,"CHANGCHUN,DAFANGSHEN",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E125411800  
+N43595400   ",
+UA,KAZAKHSTAN,CIT ,UAII,SHYMKENT,,"(2) 
++06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"125.9
+119.2","E069283200  
+N42215400   ",
+RK,KOREA S.(REP. OF),CJJ ,RKTU,CHEONGJU INTERNATIONAL,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.7
+121.875","E127295700  
+N36425900   ",
+RK,KOREA S.(REP. OF),CJU ,RKPC,JEJU INTL,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.55
+121.675","E126293400  
+N33304400   ",
+Z ,CHINA,CKG ,ZUCK,"CHONGQING,JIANGBEI",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106382400  
+N29430000   ",
+VC,SRI LANKA,CMB ,VCBI,"COLOMBO,BANDARANAIKE INTL",,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E079530708  
+N07104868   ",
+VT,THAILAND,CNX ,VTCC,CHIANG MAI INTL,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.900
+118.100","E098574600  
+N18461700   ",
+V ,INDIA,COK ,VOCI,COCHIN INTL,3,"(1) 
++05:30 ,DST not applied","BLR -  -  - 
+226 -  -  - ",,"119.75
+119.40","E076242500  
+N10091400   ",
+RP,PHILIPPINES,CRK ,RPLC,LUZON ISLAND,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E120333717  
+N15110956   ",
+UN,TURKMENISTAN,CRZ ,UTAV,CHARDZHOU,,"(1) 
++05:00 ,DST not applied","TAS -  -  - 
+311 -  -  - ",,"125.8
+131.7","E063364800  
+N39050000   ",
+Z ,CHINA,CSX ,ZGHA,"CHANGSHA,HUANGHUA",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113131800  
+N28111200   ",
+R ,JAPAN,CTS ,RJCC,"SAPPORO,NEW CHITOSE",,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E141413300  
+N42463100   ",
+Z ,CHINA,CTU ,ZUUU,"CHENGDU,SHUANGLIU",,"(1) 
++08:00 ,DST not applied","KWE - CKG -  - 
+327 - 256 -  - ",,"
+","E103565400  
+N30344800   ",
+VV,VIETNAM,CXR ,VVCR,CAM RANH INTL,,"(1) 
++07:00 ,DST not applied","DAD - SGN -  - 
+264 - 237 -  - ",,"
+118.200","E109133100  
+N11593500   ",
+Y ,AUSTRALIA,CXT ,YCHT,CHARTERS TOWERS,,"(2) 
++10:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E146162300  
+S20023500   ",
+Z ,CHINA,CZX ,ZSCG,CHANGZHOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1195800 0  
+N314200 0   ",
+VG,BANGLADESH,DAC ,VGHS,"DHAKA,ZIA INTL",,"(1) 
++06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E090235202  
+N23503605   ",
+VV,VIETNAM,DAD ,VVDN,DANANG INTL,,"(1) 
++07:00 ,DST not applied","HUI - CXR -  - 
+95 - 307 -  - ",,"121.600
+118.350","E108120100  
+N16023800   ",
+Z ,CHINA,DAT ,ZBDT,DATONG YUNGANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113285500  
+N40033700   ",
+V ,INDIA,DEL ,VIDP,"DELHI, INDIRA GANDHI INTL",,"(1) 
++05:30 ,DST not applied","LKO - JAI -  - 
+277 - 185 -  - ",,"121.900
+118.100","E077064400  
+N28340700   ",
+VV,VIETNAM,DIN ,VVDB,DIEN  BIEN  PHU,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E103000000  
+N21230000   ",
+Z ,CHINA,DLC ,ZYTL,"DALIAN,ZHOUSHUIZI",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E121321200  
+N38574800   ",
+VV,VIETNAM,DLI ,VVDL,LIEN KHUONG - DALAT,,"(1) 
++07:00 ,DST not applied","SGN - CXR -  - 
+169 - 68 -  - ",,"
+118.400","E108220000  
+N11450000   ",
+ZM,MONGOLIA,DLZ ,ZMDZ,DALANZADGAD,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E104220400  
+N43363200   ",
+U ,RUSSIAN FEDERATION,DME ,UUDD,"MOSCOW,DOMODEDOVO",,"(2) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.60
+119.70","E037542400  
+N55243000   ",
+VT,THAILAND,DMK ,VTBD,DON MUANG,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E100362000  
+N13545200   ",
+OT,QATAR,DOH ,OTBD,DOHA INTL,,"(1) 
++03:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E051335434  
+N25153981   ",
+W ,INDONESIA,DPS ,WADD,"DEN PASAR,BALI INTL",,"(2) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.800
+118.100","E115100900  
+S08445100   ",
+Y ,AUSTRALIA,DRW ,YPDN,"DARWIN INTL,NT",,"(3) 
++09:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E130523600  
+S12245300   ",
+Z ,CHINA,DSN ,ZBDS,DONGSHENG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1100200 0  
+N395100 0   ",
+RP,PHILIPPINES,DVO ,RPMD,"DAVAO,BANGOY INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E125384480  
+N07073188   ",
+OM,UNITED ARAB EMIRATES,DWC ,OMDW,AL MAKTOUM INTL,,"(1) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E055103174  
+N24550560   ",
+OM,UNITED ARAB EMIRATES,DXB ,OMDB,DUBAI INTL,,"(1) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E055215200  
+N25151000   ",
+Z ,CHINA,DYG ,ZGDY,DAYONG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1102900 0  
+N290800 0   ",
+EG,UNITED KINGDOM,EDI ,EGPH,EDINBURGH,1,"(1) 
++00:00 ,DST +01:00 3/29/2026-10/25/2026","MAN -  -  - 
+171 -  -  - ",,"121.2
+118.7","W003222100  
+N55570000   ",
+Z ,CHINA,ENH ,ZHES,Enshi Xujiaping Airport,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E109290600  
+N30191300   ",
+LI,ITALY,FCO ,LIRF,"ROME,FIUMICINO",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E012142000  
+N41480100   ",
+R ,JAPAN,FKS ,RJSF,FUKUSHIMA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E140254100  
+N37133900   ",
+Z ,CHINA,FOC ,ZSFZ,"FUZHOU,CHANGLE",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E119394200  
+N25560000   ",
+UY,KYRGYZSTAN,FRU ,UCFM,"BISHKEK,MANAS",,"(1) 
++06:00 ,DST +06:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"124.6
+118.1","E074283903  
+N43034058   ",
+R ,JAPAN,FSZ ,RJNS,SHIZUOKA,1,"(1) 
++09:00 ,DST not applied","NRT - KIX -  - 
+329 - 254 -  - ",,"120.10
+110.65","E138112200  
+N34474600   ",
+R ,JAPAN,FUK ,RJFF,FUKUOKA,,"(1) 
++09:00 ,DST not applied","KIX - KOJ -  - 
+316 - 186 -  - ",,"118.4
+121.7","E130270600  
+N33350400   ",
+V ,INDIA,GAY ,VEGY,GAYA,,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E084564100  
+N24445100   ",
+RK,KOREA S.(REP. OF),GMP ,RKSS,"SEOUL, GIMPO INTL",,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.1
+121.9","E126475100  
+N37332900   ",
+UB,AZERBAIJAN,GYD ,UBBB,"BAKU INTL, HEYDAR ALIYEV",2,"(1) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"128.00
+119.20","E050024800  
+N40280300   ",
+LT,TURKEY,GZT ,LTAJ,"GAZIANTEP,OGUZELI",,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E037284400  
+N36565200   ",
+Z ,CHINA,HAK ,ZJHK,"HAIKOU,MEILAN",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E110272400  
+N19560000   ",
+ED,GERMANY,HAM ,EDDH,HAMBURG,,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E009591762  
+N53374940   ",
+VV,VIETNAM,HAN ,VVNB,"HANOI,NOIBAI INTL",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.900
+118.400","E105482000  
+N21131800   ",
+VT,THAILAND,HDY ,VTSS,"SONGKHLA,HAT YAI INTL",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E100234200  
+N06555800   ",
+Z ,CHINA,HET ,ZBHH,"HOHHOT,BAITA",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E111493000  
+N40510600   ",
+Z ,CHINA,HFE ,ZSOF,"HEFEI,LUOGANG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E117180000  
+N31470000   ",
+Z ,CHINA,HGH ,ZSHC,"HANGZHOU,XIAOSHAN",,"(1) 
++08:00 ,DST not applied","NKG - NGB -  - 
+176 - 90 -  - ",,"
+","E120255400  
+N30134200   ",
+Z ,CHINA,HHA ,ZGHA,HUANGHUA,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113131800  
+N28111200   ",
+Z ,CHINA,HIA ,ZSSH,HUAI'AN LIANSHUI,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E119080582  
+N33471509   ",
+R ,JAPAN,HIJ ,RJOA,HIROSHIMA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E132551000  
+N34261000   ",
+VH,HONG KONG,HKG ,VHHH,HONG KONG INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.600
+118.200","E113545300  
+N22183200   ",
+VT,THAILAND,HKT ,VTSP,PHUKET INTL,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.900
+118.100","E098183300  
+N08064500   ",
+R ,JAPAN,HND ,RJTT,TOKYO (HANEDA) INTL,,"(1) 
++09:00 ,DST not applied","KIX - IBR -  - 
+383 - 78 -  - ",,"118.225
+118.100","E139465200  
+N35331200   ",
+VV,VIETNAM,HPH ,VVCI,CAT BI - HAI PHONG,,"(1) 
++07:00 ,DST not applied","DAD - HAN -  - 
+366 - 121 -  - ",,"
+118.500","E106390000  
+N20480000   ",
+Z ,CHINA,HRB ,ZYHB,"HARBIN,TAIPING",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E126150000  
+N45370000   ",
+VV,VIETNAM,HUI ,VVPB,PHU BAI INT - HUE,,"(1) 
++07:00 ,DST not applied","CXR - DAD -  - 
+322 - 72 -  - ",,"
+118.800","E107420600  
+N16240800   ",
+RC,TAIWAN,HUN ,RCYU,HUALIEN,1,"(1) 
++08:00 ,DST not applied","TPE - RMQ -  - 
+ -  -  - ",,"119.10
+236.60","E121363600  
+N24012400   ",
+V ,INDIA,HYD ,VOHS,RAJIV GANDHI INTL,,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"125.55
+118.45","E078254400  
+N17142600   ",
+K ,UNITED STATES,IAD ,KIAD,"WASHINGTON DULLES INTL,VA",2,"(1) 
+-05:00 ,DST -04:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"120.45
+120.1","W077273580  
+N38565080   ",
+R ,JAPAN,IBR ,RJAH,OMITAMA IBARAKI,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E140242795  
+N36104040   ",
+RK,KOREA S.(REP. OF),ICN ,RKSI,"SEOUL INCHEON, INCHEON INTL",,"(1) 
++09:00 ,DST not applied","GMP - CJJ -  - 
+83 - 112 -  - ",,"121.700
+118.200","E126262100  
+N37274500   ",
+U ,RUSSIAN FEDERATION,IKT ,UIII,Irkutsk International Airport,,"(2) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E104232000  
+N52160500   ",
+Z ,CHINA,INC ,ZLIC,YINCHUAN,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106233000  
+N38191800   ",
+LT,TURKEY,IST ,LTBA,"ISTANBUL,ATATURK",,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E028485074  
+N40583420   ",
+V ,INDIA,JAI ,VIJP,JAIPUR,,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"125.25
+126.6","E075480900  
+N26492700   ",
+K ,UNITED STATES,JFK ,KJFK,"NEW YORK,NY,KENNEDY INTL",6,"(1) 
+-05:00 ,DST -04:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"119.100
+119.100","W073464413  
+N40382310   ",
+WM,MALAYSIA,JHB ,WMKJ,"JOHOR BAHRU,SULTAN ISMAIL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E103401300  
+N01382600   ",
+Z ,CHINA,JJN ,ZSQZ,JINJIANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1183500 0  
+N245400 0   ",
+VT,THAILAND,KBV ,VTSG,KRABI,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E098591955  
+N08054549   ",
+RC,TAIWAN,KHH ,RCKH,KAOHSIUNG INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.800
+118.700","E120210100  
+N22343700   ",
+Z ,CHINA,KHN ,ZSCN,NANCHANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E115540000  
+N28515400   ",
+U ,RUSSIAN FEDERATION,KHV ,UHHH,Khabarovsk Novy Airport,,"(8) 
++10:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E135111800  
+N48314100   ",
+R ,JAPAN,KIJ ,RJSN,NIIGATA,3,"(1) 
++09:00 ,DST not applied","NRT - KIX -  - 
+329 - 254 -  - ",,"121.40
+118.00","E139064200  
+N37572100   ",
+R ,JAPAN,KIX ,RJBB,"OSAKA, KANSAI INTL",,"(1) 
++09:00 ,DST not applied","FUK - NGO -  - 
+306 - 299 -  - ",,"118.2
+121.6","E135135800  
+N34260300   ",
+U ,RUSSIAN FEDERATION,KJA ,UNKL,KRASNOYARSK,,"(5) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E092293600  
+N56101800   ",
+Z ,CHINA,KMG ,ZPPP,"KUNMING,WUJIABA",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E102450000  
+N25000000   ",
+R ,JAPAN,KMQ ,RJNK,KOMATSU,1,"(1) 
++09:00 ,DST not applied","KIX - NGO -  - 
+269 - 230 -  - ",,"120.10
+123.10","E136242829  
+N36233707   ",
+RC,TAIWAN,KNH ,RCBS,KINMEN,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E118214000  
+N24254400   ",
+R ,JAPAN,KOJ ,RJFK,KAGOSHIMA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.2
+121.7","E130431000  
+N31481200   ",
+VD,CAMBODIA,KOS ,VDSV,KOMPONG SOM,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E103381200  
+N10344700   ",
+VD,CAMBODIA,KTI ,VDTI,Techo International Airport,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106030000  
+N12290000   ",
+EP,POLAND,KTW ,EPKT,"KATOWICE,PYRZOWICE",1,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026","WAW -  -  - 
+186 -  -  - ",,"135.400
+129.250","E019044807  
+N50282731   ",
+U ,RUSSIAN FEDERATION,KUF ,UWWW,"SAMARA,KURUMOCH",,"(1) 
++03:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E050091800  
+N53300600   ",
+WM,MALAYSIA,KUL ,WMKK,KUALA LUMPUR INTL SEPANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.800
+118.500","E101415300  
+N02443600   ",
+EY,LITHUANIA,KUN ,EYKA,KAUNAS INTL,,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E024050520  
+N54575011   ",
+Z ,CHINA,KWE ,ZUGY,GUIYANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106481200  
+N26321200   ",
+Z ,CHINA,KWL ,ZGKL,"GUILIN,LIANGJIANG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E110022400  
+N25130000   ",
+U ,RUSSIAN FEDERATION,KZN ,UWKD,KAZAN,,"(1) 
++03:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E049165400  
+N55362400   ",
+RP,PHILIPPINES,LAO ,RPLI,LAOAG INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E120315255  
+N18104000   ",
+K ,UNITED STATES,LAX ,KLAX,"LOS ANGELES INTL,CA",9,"(4) 
+-08:00 ,DST -07:00 3/8/2026-11/1/2026","SFO -  -  - 
+293 -  -  - ",,"124.3
+128.2","W118242578  
+N33563308   ",
+LF,FRANCE,LBG ,LFPB,"PARIS,LE BOURGET",1,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026","CDG -  -  - 
+6 -  -  - ",,"116.10
+","E002262937  
+N48581029   ",
+EG,UNITED KINGDOM,LGW ,EGKK,"LONDON, GATWICK",,"(1) 
++00:00 ,DST +01:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","W000112500  
+N51085300   ",
+EG,UNITED KINGDOM,LHR ,EGLL,"LONDON, HEATHROW",23,"(1) 
++00:00 ,DST +01:00 3/29/2026-10/25/2026","MAN -  -  - 
+138 -  -  - ",,"134.975
+118.500","W000274100  
+N51283900   ",
+Z ,CHINA,LHW ,ZLLL,LANZHOU ZONGCHUAN,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","W081334184  
+N31531792   ",
+LF,FRANCE,LIG ,LFBL,"LIMOGES,BELLEGARDE",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E001104910  
+N45513875   ",
+Z ,CHINA,LJG ,ZPLJ,Lijiang Sanyi International Airport,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E100144700  
+N26404200   ",
+V ,INDIA,LKO ,VILK,LUCKNOW,,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"126.8
+118.6","E080530000  
+N26454300   ",
+W ,INDONESIA,LOP ,WADL,LOMBOK INTERNATIONAL,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E000000000  
+N00000000   ",
+VV,VIETNAM,LTH ,VVLT,LONG THANH INTERNATIONAL AIRPORT,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E107024300  
+N10462100   ",
+Z ,CHINA,LYI ,ZSLY,LINYI SHUBULING,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E118413286  
+N35048243   ",
+V ,INDIA,MAA ,VOMM,CHENNAI INTL,123,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"124.45
+118.10","E080103180  
+N12594170   ",
+EG,UNITED KINGDOM,MAN ,EGCC,MANCHESTER,,"(1) 
++00:00 ,DST +01:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","W002163000  
+N53211400   ",
+Y ,AUSTRALIA,MEL ,YMML,MELBOURNE TULLAMARINE INTL,,"(2) 
++10:00 ,DST +11:00 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"135.700
+120.500","E144503600  
+S37402400   ",
+VM,MACAU,MFM ,VMMC,MACAU INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E113352900  
+N22085800   ",
+K ,UNITED STATES,MIA ,KMIA,"MIAMI INTL,FL",,"(1) 
+-05:00 ,DST -04:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"
+","W080172442  
+N25474331   ",
+RP,PHILIPPINES,MNL ,RPLL,"MANILA,NINOY AQUINO INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E121004989  
+N14303579   ",
+EH,NETHERLANDS,MST ,EHBK,MAASTRICHT  AACHEN,,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E005463700  
+N50545700   ",
+RK,KOREA S.(REP. OF),MWX ,RKJB,MUAN INTERNATIONAL,,"(1) 
++09:00 ,DST not applied","ICN - CJJ -  - 
+207 - 223 -  - ",,"118.25
+121.7","E126225800  
+N34593900   ",
+R ,JAPAN,MYJ ,RJOM,MATSUYAMA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E132415900  
+N33493800   ",
+RC,TAIWAN,MZG ,RCQC,MAKUNG AB,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E119374200  
+N23340700   ",
+Z ,CHINA,NGB ,ZSNB,"NINGBO,LISHE",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E121274800  
+N29492400   ",
+R ,JAPAN,NGO ,RJGG,"NAGOYA, CHUBU CENTRAIR INTL",,"(1) 
++09:00 ,DST not applied","NRT - KIX -  - 
+334 - 212 -  - ",,"118.85
+121.8","E136481900  
+N34513000   ",
+Z ,CHINA,NKG ,ZSNJ,"NANJING,LUKOU",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E118513600  
+N31442400   ",
+Z ,CHINA,NNG ,ZGNN,"NANNING,WUXU",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E108110000  
+N22370000   ",
+U ,RUSSIAN FEDERATION,NOZ ,    ,NOVOKUZNETSK,,"(5) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E087060000  
+N53450000   ",
+UA,KAZAKHSTAN,NQZ ,UACC,Nursultan Nazarbayev,2,"(1) 
++05:00 ,DST not applied","ALA -  -  - 
+513 -  -  - ",,"124.60
+118.70","E071280100  
+N51012000   ",
+R ,JAPAN,NRT ,RJAA,NARITA INTL,,"(1) 
++09:00 ,DST not applied","NGO - HND -  - 
+263 - 177 -  - ",,"121.95
+118.200","E140230800  
+N35455500   ",
+Z ,CHINA,NTG ,ZSNT,NANTONG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1205800 0  
+N320400 0   ",
+R ,JAPAN,OKA ,ROAH,NAHA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E127384500  
+N26114500   ",
+R ,JAPAN,OKJ ,RJOB,OKAYAMA AIRPORT,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E133511100  
+N34451500   ",
+LF,FRANCE,ORY ,LFPO,"PARIS,ORLY",1234,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026","CDG -  -  - 
+19 -  -  - ",,"123.875
+118.7","E002224648  
+N48432381   ",
+U ,RUSSIAN FEDERATION,OVB ,UNNT,"NOVOSIBIRSK,TOLMACHEVO",,"(5) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E082355400  
+N55020000   ",
+MP,PANAMA,PAC ,MPMG,PANAMA CITY,,"(1) 
+-05:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","W079332000  
+N08582400   ",
+VQ,BHUTAN,PBH ,VQPR,PARO,,"(1) 
++06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E089252955  
+N27241247   ",
+Z ,CHINA,PEK ,ZBAA,BEIJING CAPITAL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E116354200  
+N40042400   ",
+WM,MALAYSIA,PEN ,WMKP,PENANG INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E100163600  
+N05175000   ",
+Y ,AUSTRALIA,PER ,YPPH,"PERTH INTL,WA",,"(4) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E115580100  
+S31562500   ",
+Z ,CHINA,PKX ,ZBAD,BEIJING DAXING,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E116243800  
+N39303300   ",
+W ,INDONESIA,PLM ,WIPP,"PALEMBANG,SULTAN M BADARUDDIN II",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E104420000  
+S02540100   ",
+VD,CAMBODIA,PNH ,VDPP,"PHNOM PENH,POCHENTONG INTL",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"123.8
+118","E104503900  
+N11324800   ",
+VV,VIETNAM,PQC ,VVPQ,PHUQUOC,,"(1) 
++07:00 ,DST not applied","SGN - VCA -  - 
+278 - 141 -  - ",,"
+118.600","E104000000  
+N10150000   ",
+LK,CZECH REP,PRG ,LKPR,"PRAGUE,RUZYNE",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E014153600  
+N50060300   ",
+RK,KOREA S.(REP. OF),PUS ,RKPK,"BUSAN, GIMHAE INTL",,"(1) 
++09:00 ,DST not applied","ICN - CJU -  - 
+231 - 197 -  - ",,"121.900
+118.100","E128561700  
+N35105000   ",
+Z ,CHINA,PVG ,ZSPD,"SHANGHAI,PUDONG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E121472400  
+N31083000   ",
+VV,VIETNAM,PXU ,VVPK,PLEIKU,,"(1) 
++07:00 ,DST not applied","SGN - CXR -  - 
+365 - 236 -  - ",,"
+118.100","E108000000  
+N14000000   ",
+VD,CAMBODIA,REP ,VDSR,"SIEM REAP, CAMBODIA,SIEM REAP",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.900
+118.300","E103484400  
+N13243900   ",
+VY,MYANMAR (BURMA),RGN ,VYYY,YANGON INTL,,"(1) 
++06:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.900
+118.100","E096075966  
+N16542616   ",
+RC,TAIWAN,RMQ ,RCMQ,TAICHUNG  INTL,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"120.250
+118.750","E120360469  
+N24151767   ",
+PW,PALAU,ROR ,PTRO,"BABELTHUAP I,BABELTHUAP  KOROR",,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E134323940  
+N07220229   ",
+VD,CAMBODIA,SAI ,VDSA,The new Siem Reap Airport,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E000000000  
+N00000000   ",
+LT,TURKEY,SAW ,LTFJ,"ISTANBUL, SABIHA GOKCEN",,"(1) 
++02:00 ,DST +03:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E029183300  
+N40535400   ",
+R ,JAPAN,SDJ ,RJSS,SENDAI,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E140550100  
+N38082300   ",
+K ,UNITED STATES,SFO ,KSFO,"SAN FRANCISCO INTL,CA",4,"(4) 
+-08:00 ,DST -07:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"128.325
+120.5","W122222960  
+N37370830   ",
+MM,MEXICO,SGM ,    ,SAN IGNACIO,,"(1) 
+-06:00 ,DST -05:00 4/5/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","W11256000   
+N2717000    ",
+VV,VIETNAM,SGN ,VVTS,TANSONNHAT - HOCHIMINH,,"(1) 
++07:00 ,DST not applied","VCA - CXR -  - 
+215 - 83 -  - ",,"121.9
+118.7","E106393900  
+N10491400   ",
+Z ,CHINA,SHE ,ZYTX,"SHENYANG,TAOXIAN",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E123290600  
+N41381800   ",
+R ,JAPAN,SHM ,RJBD,NANKI  SHIRAHAMA,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E135215200  
+N33394400   ",
+WS,SINGAPORE,SIN ,WSSS,"SINGAPORE,CHANGI",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"125.650
+118.600","E103592160  
+N01213316   ",
+Z ,CHINA,SJW ,ZBSJ,"SHIJIAZHUANG,ZHENGDING",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E114415400  
+N38164200   ",
+VT,THAILAND,SNO ,VTUI,SAKON NAKHON,,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E104070700  
+N17114300   ",
+EG,UNITED KINGDOM,STN ,EGSS,"LONDON, STANSTED",,"(1) 
++00:00 ,DST +01:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E000140600  
+N51530600   ",
+W ,INDONESIA,SUB ,WRSJ,"SURABAYA,JUANDA",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E112471100  
+S07225100   ",
+U ,RUSSIAN FEDERATION,SVO ,UUEE,"MOSCOW,SHEREMETYEVO",,"(1) 
++03:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"119.00
+120.70","E037245400  
+N55581800   ",
+U ,RUSSIAN FEDERATION,SVX ,USSS,"YEKATERINBURG,KOLTSOVO",,"(4) 
++06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E060481800  
+N56443600   ",
+Z ,CHINA,SWA ,ZGOW,SHANTOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E116454800  
+N23254200   ",
+K ,UNITED STATES,SWF ,KSWF,"NEWBURGH,NY,STEWART INTL",,"(1) 
+-05:00 ,DST -04:00 3/8/2026-11/1/2026"," -  -  - 
+ -  -  - ",,"
+","W074061740  
+N41301480   ",
+Y ,AUSTRALIA,SYD ,YSSY,"SYDNEY, KINGSFORD SMITH INTL",,"(2) 
++10:00 ,DST +11:00 10/4/2026-4/5/2026"," -  -  - 
+ -  -  - ",,"133.800
+120.500","E151103800  
+S33564600   ",
+Z ,CHINA,SYX ,ZJSY,"SANYA,PHOENIX INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E109244800  
+N18180600   ",
+WM,MALAYSIA,SZB ,WMSA,SUBANG SULTAN ABDUL AZIZ SHAH,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E101325300  
+N03075200   ",
+Z ,CHINA,SZX ,ZGSZ,"SHENZHEN,HUANGTIAN",3,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"118.45
+120.35","E113484200  
+N22381800   ",
+RK,KOREA S.(REP. OF),TAE ,RKTN,DAEGU INTERNATIONAL,,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.950
+126.200","E128393200  
+N35533900   ",
+R ,JAPAN,TAK ,RJOT,TAKAMATSU AIRPORT,,"(1) 
++09:00 ,DST not applied","FUK - NGO -  - 
+306 - 299 -  - ",,"118.2
+121.6","E134005600  
+N34125100   ",
+Z ,CHINA,TAO ,ZSQD,"QINGDAO,LIUTING",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E120223000  
+N36155400   ",
+UT,UZBEKISTAN,TAS ,UTTT,"TASHKENT,YUZHNY",,"(1) 
++05:00 ,DST +05:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E069165400  
+N41153000   ",
+VV,VIETNAM,TBB ,VVTH,TUY HOA,,"(1) 
++07:00 ,DST not applied","CXR - SGN -  - 
+162 - 304 -  - ",,"
+118.900","E109020000  
+N13030000   ",
+Z ,CHINA,TFU ,ZUTF,CHENGDU TIANFU,2,"(1) 
++08:00 ,DST not applied","CTU - KWE -  - 
+ -  -  - ",,"119.70
+118.15","E000000000  
+N00000000   ",
+VV,VIETNAM,THD ,VVTX,SAO VANG - THO XUAN,,"(1) 
++07:00 ,DST not applied","HAN - DAD -  - 
+146 - 311 -  - ",,"
+118.650","E105274598  
+N19531339   ",
+LF,FRANCE,TLS ,LFBO,"TOULOUSE,BLAGNAC",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E001220428  
+N43380646   ",
+LL,ISRAEL,TLV ,LLBG,"TEL AVIV,BEN GURION",,"(1) 
++02:00 ,DST +03:00 3/27/2026-10/4/2026"," -  -  - 
+ -  -  - ",,"19.35
+","E034523700  
+N32003400   ",
+Z ,CHINA,TNA ,ZSJN,"JINAN,YAOQIANG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E117130000  
+N36511800   ",
+RC,TAIWAN,TNN ,RCNN,TAINAN AERO,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.600
+118.400","E120124000  
+N22565700   ",
+RC,TAIWAN,TPE ,RCTP,"TAIPEI,TAOYUAN INTL",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"121.700
+118.700","E121135600  
+N25044900   ",
+V ,INDIA,TRZ ,VOTR,TIRUCHIRAPPALLI,2,"(1) 
++05:30 ,DST not applied","BLR -  -  - 
+219 -  -  - ",,"124.00
+118.30","E078425414  
+N10455610   ",
+UA,KAZAKHSTAN,TSE ,UACC,"AKMOLA, ASTANA",,"(2) 
++06:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E071280100  
+N51012000   ",
+AY,PAPUA NEW GUINEA,TSK ,    ,TASKUL,,"(1) 
++10:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E15027000   
+S0232000    ",
+Z ,CHINA,TSN ,ZBTJ,"TIANJIN,BINHAI",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E117204800  
+N39073000   ",
+RC,TAIWAN,TTT ,RCFN,TAITUNG AIRPORT,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"120.250
+118.750","E121060600  
+N22451700   ",
+Z ,CHINA,TXN ,ZSTX,HUANGSHAN TUNXI,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E118151000  
+N29434800   ",
+Z ,CHINA,TYN ,ZBYN,"TAIYUAN,WUSU",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E112374800  
+N37445400   ",
+ZM,MONGOLIA,UBN ,ZMCK,Chinggis Khaan International Airport,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106490000  
+N47380000   ",
+U ,RUSSIAN FEDERATION,UFA ,UWUU,Ufa International Airport,,"(3) 
++05:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E055524900  
+N54334900   ",
+VV,VIETNAM,UIH ,VVPC,PHU CAT - QUI NHON,,"(1) 
++07:00 ,DST not applied","CXR - SGN -  - 
+178 - 374 -  - ",,"
+118.600","E109140000  
+N13460000   ",
+R ,JAPAN,UKB ,RJBE,KOBE AIRPORT,,"(1) 
++09:00 ,DST not applied","FUK - NGO -  - 
+306 - 299 -  - ",,"
+","E135132600  
+N34375800   ",
+ZM,MONGOLIA,ULN ,ZMUB,"ULAANBAATAR,BUYANT  UKHAA",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E106460300  
+N47503300   ",
+Z ,CHINA,URC ,ZWWW,Urumqi Diwopu International,,"(1) 
++08:00 ,DST not applied","NKG - NGB -  - 
+176 - 90 -  - ",,"
+","E087282700  
+N43542600   ",
+VT,THAILAND,UTP ,VTBU,"RAYONG,U  TAPHAO INTL",,"(1) 
++07:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E101001770  
+N12404660   ",
+Z ,CHINA,UYN ,ZLYL,YULIN,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1092900 0  
+N380200 0   ",
+VV,VIETNAM,VCA ,VVCT,CAN THO INTL,,"(1) 
++07:00 ,DST not applied","SGN - PQC -  - 
+101 - 126 -  - ",,"
+118.800","E105460000  
+N10030000   ",
+VV,VIETNAM,VCL ,VVCA,CHU LAI,,"(1) 
++07:00 ,DST not applied","CXR - DAD -  - 
+263 - 72 -  - ",,"
+118.250","E108421619  
+N15243136   ",
+VV,VIETNAM,VCS ,VVCS,CON DAO AIRPORT,,"(1) 
++07:00 ,DST not applied","SGN - VCA -  - 
+278 - 141 -  - ",,"
+118.600","E106374400  
+N08435700   ",
+VV,VIETNAM,VDH ,VVDH,DONG HOI,,"(1) 
++07:00 ,DST not applied","DAD - VII -  - 
+165 - 127 -  - ",,"
+118.700","E106352598  
+N17305400   ",
+VV,VIETNAM,VDO ,VVVD,VAN DON INTL,,"(1) 
++07:00 ,DST not applied","HAN - HPH -  - 
+130 - 94 -  - ",,"
+118.100","E107245100  
+N21070400   ",
+VV,VIETNAM,VII ,VVVH,VINH INTL,,"(1) 
++07:00 ,DST not applied","DAD - HAN -  - 
+238 - 183 -  - ",,"
+118.300","E105040000  
+N18440000   ",
+U ,RUSSIAN FEDERATION,VKO ,UUWW,"MOSCOW,VNUKOVO",,"(2) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"120.45
+118.30","E037162400  
+N55360000   ",
+V ,INDIA,VNS ,VEBN,VARANASI,1,"(1) 
++05:30 ,DST not applied"," -  -  - 
+ -  -  - ",,"119.00
+118.1","E082513100  
+N25270500   ",
+VL,LAOS (PEOP.DEM.REP.),VTE ,VLVT,"VIENTIANE,WATTAY INTL",,"(1) 
++07:00 ,DST not applied","HAN - VII -  - 
+267 - 183 -  - ",,"119.700
+118.100","E102341500  
+N17590000   ",
+U ,RUSSIAN FEDERATION,VVO ,UHWW,"VLADIVOSTOK,KNEVICHI",,"(8) 
++10:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E132084800  
+N43235400   ",
+EP,POLAND,WAW ,EPWA,"WARSAW,OKECIE",0,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026","KTW -  -  - 
+186 -  -  - ",,"128.805
+118.300","E020580164  
+N52095670   ",
+Z ,CHINA,WNZ ,ZSWZ,WENZHOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1210400 0  
+N280000 0   ",
+Z ,CHINA,WUH ,ZHHH,"WUHAN,TIANHE",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E114123600  
+N30470600   ",
+Z ,CHINA,WUX ,ZSWX,WUXI,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1201900 0  
+N313500 0   ",
+Z ,CHINA,XFN ,ZHXF,XIANGYANG LIUJI AIRPORT,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E112010000  
+N32030000   ",
+ED,GERMANY,XFW ,EDHI,"HAMBURG,FINKENWERDER",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E009500771  
+N53320744   ",
+Z ,CHINA,XIY ,ZLXY,"XIAN,XIANYANG",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E108450000  
+N34264200   ",
+Z ,CHINA,XMN ,ZSAM,"XIAMEN,GAOQI",2,"(1) 
++08:00 ,DST not applied","FOC -  -  - 
+118 -  -  - ",,"121.35
+118.25","E118073000  
+N24323600   ",
+Z ,CHINA,XNN ,ZLXN,Xining Caojiapu International Airport,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","W102023400  
+N36313900   ",
+Z ,CHINA,XUZ ,ZSXZ,XUZHOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1171100 0  
+N341600 0   ",
+Z ,CHINA,YCU ,ZBYC,YUNCHENG YANHU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E111022300  
+N35070000   ",
+R ,JAPAN,YGJ ,RJOH,"YONAGO,MIHO AERO",,"(1) 
++09:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E133142100  
+N35293600   ",
+Z ,CHINA,YIH ,ZHYC,YICHANG,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1111100 0  
+N304200 0   ",
+Z ,CHINA,YIW ,ZSYW,YIWU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1200300 0  
+N291600 0   ",
+Z ,CHINA,YNT ,ZSYT,"YANTAI,LAISHAN",,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E121221800  
+N37240600   ",
+RK,KOREA S.(REP. OF),YNY ,RKNY,YANGYANG INTL,,"(1) 
++09:00 ,DST not applied","ICN - GMP -  - 
+182 - 152 -  - ",,"118.85
+124.3","E128400900  
+N38034100   ",
+Z ,CHINA,YTY ,ZSYA,YANGZHOU TAIZHOU,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E119425400  
+N32334200   ",
+LD,CROATIA,ZAG ,LDZA,"ZAGREB,PLESO",,"(1) 
++01:00 ,DST +02:00 3/29/2026-10/25/2026"," -  -  - 
+ -  -  - ",,"
+","E016040760  
+N45443455   ",
+Z ,CHINA,ZGC ,ZLLL,LANZHOU ZHONGCHUAN,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E103371800  
+N36310000   ",
+Z ,CHINA,ZHA ,ZGZJ,Zhanjiang Wuchuan International Airport,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E110352500  
+N21285400   ",
+U ,RUSSIAN FEDERATION,ZIA ,UUBW,Zhukovsky International Airport,,"(2) 
++04:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"131.000
+125.250","E038070516  
+N55334284   ",
+Z ,CHINA,ZYI ,ZUZY,ZUNYI,,"(1) 
++08:00 ,DST not applied"," -  -  - 
+ -  -  - ",,"
+","E1060500 0  
+N270400 0   ",
+Total Records found: 259
+"Generated on  Apr 30, 2026 15:59",,,,,,Page 1 of 1

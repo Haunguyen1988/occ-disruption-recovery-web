@@ -1,4 +1,8 @@
 import type { OccRules } from "@/lib/types";
+import {
+  AIRPORT_TIMEZONES as GENERATED_TIMEZONES,
+  AIRPORT_UTC_OFFSETS as GENERATED_OFFSETS,
+} from "@/../data/airport-timezones";
 
 export function overlaps(
   startA: Date,
@@ -36,89 +40,20 @@ export function minTurnaroundForType(
 // Timezone-aware helpers (Sprint 8)
 // =============================================================================
 //
+// Airport timezone and UTC offset data is auto-generated from
+// AirportUTCReport.csv (259 airports). To regenerate, run:
+//   node scripts/parse-airport-utc.cjs
+//
 // We use IANA time-zone identifiers + `Intl.DateTimeFormat` so DST transitions
 // (notably AU stations during their summer) are handled correctly without us
-// hand-rolling a DST table. The static-offset map below is retained as a
-// best-effort fallback for `getAirportUtcOffsetHours` (used by older callers
-// and a handful of unit tests); for any *new* code, prefer
-// `getAirportTimezone` + `localToUtc` / `utcToLocalMinuteOfDay`.
+// hand-rolling a DST table.
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
+const VN_DEFAULT_UTC_OFFSET_HOURS = 7;
 
-/** IANA timezone for each station that appears in the AIMS DayRep + samples. */
-const AIRPORT_TIMEZONES: Record<string, string> = {
-  // Vietnam (UTC+7, no DST)
-  HAN: "Asia/Ho_Chi_Minh",
-  SGN: "Asia/Ho_Chi_Minh",
-  DAD: "Asia/Ho_Chi_Minh",
-  CXR: "Asia/Ho_Chi_Minh",
-  PQC: "Asia/Ho_Chi_Minh",
-  VCL: "Asia/Ho_Chi_Minh",
-  VCS: "Asia/Ho_Chi_Minh",
-  BMV: "Asia/Ho_Chi_Minh",
-  HUI: "Asia/Ho_Chi_Minh",
-  HPH: "Asia/Ho_Chi_Minh",
-  VCA: "Asia/Ho_Chi_Minh",
-  UIH: "Asia/Ho_Chi_Minh",
-  VKG: "Asia/Ho_Chi_Minh",
-  VDH: "Asia/Ho_Chi_Minh",
-  DLI: "Asia/Ho_Chi_Minh",
-  VDO: "Asia/Ho_Chi_Minh",
-  THD: "Asia/Ho_Chi_Minh",
-  DIN: "Asia/Ho_Chi_Minh",
-  TBB: "Asia/Ho_Chi_Minh",
-  PXU: "Asia/Ho_Chi_Minh",
-  VII: "Asia/Ho_Chi_Minh",
-  // Thailand
-  BKK: "Asia/Bangkok",
-  HKT: "Asia/Bangkok",
-  // Indonesia
-  CGK: "Asia/Jakarta",
-  DPS: "Asia/Makassar",
-  // Laos
-  VTE: "Asia/Vientiane",
-  // Singapore / Malaysia
-  SIN: "Asia/Singapore",
-  KUL: "Asia/Kuala_Lumpur",
-  // China / HK / Macau / Taiwan / Philippines
-  HKG: "Asia/Hong_Kong",
-  MFM: "Asia/Macau",
-  MNL: "Asia/Manila",
-  CEB: "Asia/Manila",
-  TPE: "Asia/Taipei",
-  RMQ: "Asia/Taipei",
-  KHH: "Asia/Taipei",
-  CAN: "Asia/Shanghai",
-  PVG: "Asia/Shanghai",
-  PKX: "Asia/Shanghai",
-  HGH: "Asia/Shanghai",
-  KWL: "Asia/Shanghai",
-  ENH: "Asia/Shanghai",
-  TXN: "Asia/Shanghai",
-  // Korea
-  ICN: "Asia/Seoul",
-  PUS: "Asia/Seoul",
-  // Japan
-  NRT: "Asia/Tokyo",
-  HND: "Asia/Tokyo",
-  KIX: "Asia/Tokyo",
-  NGO: "Asia/Tokyo",
-  FSZ: "Asia/Tokyo",
-  FUK: "Asia/Tokyo",
-  HIJ: "Asia/Tokyo",
-  // Russia (Asia)
-  OVB: "Asia/Novosibirsk",
-  KJA: "Asia/Krasnoyarsk",
-  NOZ: "Asia/Krasnoyarsk",
-  KHV: "Asia/Vladivostok",
-  // Australia (DST applies)
-  SYD: "Australia/Sydney",
-  MEL: "Australia/Melbourne",
-  // India
-  BOM: "Asia/Kolkata",
-  DEL: "Asia/Kolkata",
-  AMD: "Asia/Kolkata",
-};
+// Use generated maps (259 airports from AirportUTCReport.csv)
+const AIRPORT_TIMEZONES: Record<string, string> = GENERATED_TIMEZONES;
+const AIRPORT_UTC_OFFSETS: Record<string, number> = GENERATED_OFFSETS;
 
 /** Returns the IANA timezone for an airport, defaulting to Asia/Ho_Chi_Minh. */
 export function getAirportTimezone(airport: string): string {
@@ -156,9 +91,7 @@ function tzOffsetMinutesAt(utcMs: number, tz: string): number {
 
 /**
  * Convert a calendar date + clock time in the given timezone to a true UTC
- * instant. Two-pass refinement handles DST transitions: the first pass uses
- * the offset at the naive UTC guess; the second pass uses the offset at the
- * refined UTC. For non-DST zones (most of Asia) one pass would suffice.
+ * instant. Two-pass refinement handles DST transitions.
  */
 export function localToUtc(
   year: number,
@@ -193,28 +126,6 @@ export function utcToLocalMinuteOfDay(utc: Date, airport: string): number {
 export function localTimeOfDayMinutes(utc: Date, airport: string): number {
   return utcToLocalMinuteOfDay(utc, airport);
 }
-
-// ---------------------------------------------------------------------------
-// Static-offset fallback (kept for back-compat with existing callers/tests).
-// ---------------------------------------------------------------------------
-
-const VN_DEFAULT_UTC_OFFSET_HOURS = 7;
-
-const AIRPORT_UTC_OFFSETS: Record<string, number> = {
-  HAN: 7, SGN: 7, DAD: 7, CXR: 7, PQC: 7, VCL: 7, VCS: 7, BMV: 7, HUI: 7,
-  HPH: 7, VCA: 7, UIH: 7, VKG: 7, VDH: 7, DLI: 7, VDO: 7, THD: 7, DIN: 7,
-  TBB: 7, PXU: 7, VII: 7,
-  BKK: 7, HKT: 7,
-  CGK: 7, DPS: 8,
-  VTE: 7,
-  OVB: 7, KJA: 7, NOZ: 7, KHV: 10,
-  SIN: 8, KUL: 8, HKG: 8, MFM: 8, MNL: 8, CEB: 8,
-  TPE: 8, RMQ: 8, KHH: 8,
-  CAN: 8, PVG: 8, PKX: 8, HGH: 8, KWL: 8, ENH: 8, TXN: 8,
-  ICN: 9, PUS: 9, NRT: 9, HND: 9, KIX: 9, NGO: 9, FSZ: 9, FUK: 9, HIJ: 9,
-  SYD: 10, MEL: 10,
-  BOM: 5.5, DEL: 5.5, AMD: 5.5,
-};
 
 /**
  * @deprecated Returns the *standard-time* (non-DST) offset only. Use

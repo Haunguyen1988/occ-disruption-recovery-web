@@ -15,6 +15,37 @@ export interface SessionInfo {
   role: "viewer" | "controller" | "admin";
 }
 
+export interface OperationalData {
+  schedule: FlightLeg[];
+  aircraft: Aircraft[];
+  disruption: DisruptionEvent | null;
+}
+
+type OperationalQuerySource = "flights" | "aircraft" | "disruption_events";
+
+interface SupabaseQueryError {
+  message?: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+}
+
+export interface OperationalLoadIssue {
+  source: OperationalQuerySource;
+  message: string;
+  code?: string;
+}
+
+export interface OperationalLoadError {
+  message: string;
+  issues: OperationalLoadIssue[];
+}
+
+export interface OperationalDataResult {
+  data: OperationalData | null;
+  error: OperationalLoadError | null;
+}
+
 export async function getSession(): Promise<SessionInfo | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createSupabaseServerClient();
@@ -71,78 +102,126 @@ interface DisruptionRow {
   description: string | null;
 }
 
-export async function loadOperationalData(): Promise<{
-  schedule: FlightLeg[];
-  aircraft: Aircraft[];
-  disruption: DisruptionEvent | null;
-} | null> {
+function queryErrorMessage(error: SupabaseQueryError): string {
+  const parts = [error.message, error.details, error.hint]
+    .map((p) => p?.trim())
+    .filter((p): p is string => Boolean(p));
+  return parts.length ? parts.join(" ") : "Unknown Supabase query error";
+}
+
+export function collectOperationalLoadErrors(
+  results: {
+    source: OperationalQuerySource;
+    error?: SupabaseQueryError | null;
+  }[],
+): OperationalLoadError | null {
+  const issues = results
+    .filter((r) => Boolean(r.error))
+    .map((r) => ({
+      source: r.source,
+      message: queryErrorMessage(r.error!),
+      code: r.error?.code,
+    }));
+
+  if (issues.length === 0) return null;
+  return {
+    message: `Failed to load operational data from Supabase (${issues
+      .map((i) => i.source)
+      .join(", ")}).`,
+    issues,
+  };
+}
+
+export async function loadOperationalData(): Promise<OperationalDataResult | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: flights }, { data: planes }, { data: events }] = await Promise.all([
-    supabase
-      .from("flights")
-      .select(
-        "flight_id, flight_number, origin, destination, std, sta, aircraft_id, aircraft_type, priority_level, load_factor, is_international, is_last_flight_of_day",
-      )
-      .order("std", { ascending: true }),
-    supabase
-      .from("aircraft")
-      .select(
-        "aircraft_id, aircraft_type, current_station, available_from, status, next_maintenance_time, restriction",
-      ),
-    supabase
-      .from("disruption_events")
-      .select(
-        "event_id, event_type, affected_aircraft, affected_airport, affected_flight_id, start_time, end_time, severity, description",
-      )
-      .order("created_at", { ascending: false })
-      .limit(1),
-  ]);
+  try {
+    const [flightResult, aircraftResult, eventResult] = await Promise.all([
+      supabase
+        .from("flights")
+        .select(
+          "flight_id, flight_number, origin, destination, std, sta, aircraft_id, aircraft_type, priority_level, load_factor, is_international, is_last_flight_of_day",
+        )
+        .order("std", { ascending: true }),
+      supabase
+        .from("aircraft")
+        .select(
+          "aircraft_id, aircraft_type, current_station, available_from, status, next_maintenance_time, restriction",
+        ),
+      supabase
+        .from("disruption_events")
+        .select(
+          "event_id, event_type, affected_aircraft, affected_airport, affected_flight_id, start_time, end_time, severity, description",
+        )
+        .order("created_at", { ascending: false })
+        .limit(1),
+    ]);
 
-  const schedule: FlightLeg[] = (flights ?? []).map((row: FlightRow) => ({
-    flight_id: row.flight_id,
-    flight_number: row.flight_number,
-    origin: row.origin,
-    destination: row.destination,
-    std: new Date(row.std),
-    sta: new Date(row.sta),
-    aircraft_id: row.aircraft_id,
-    aircraft_type: row.aircraft_type,
-    priority_level: row.priority_level,
-    load_factor: Number(row.load_factor),
-    is_international: row.is_international,
-    is_last_flight_of_day: row.is_last_flight_of_day,
-  }));
+    const loadError = collectOperationalLoadErrors([
+      { source: "flights", error: flightResult.error },
+      { source: "aircraft", error: aircraftResult.error },
+      { source: "disruption_events", error: eventResult.error },
+    ]);
+    if (loadError) return { data: null, error: loadError };
 
-  const aircraft: Aircraft[] = (planes ?? []).map((row: AircraftRow) => ({
-    aircraft_id: row.aircraft_id,
-    aircraft_type: row.aircraft_type,
-    current_station: row.current_station,
-    available_from: new Date(row.available_from),
-    status: row.status,
-    next_maintenance_time: row.next_maintenance_time
-      ? new Date(row.next_maintenance_time)
-      : null,
-    restriction: row.restriction,
-  }));
+    const flights = flightResult.data;
+    const planes = aircraftResult.data;
+    const events = eventResult.data;
 
-  const ev = events?.[0] as DisruptionRow | undefined;
-  const disruption: DisruptionEvent | null = ev
-    ? {
-        event_id: ev.event_id,
-        event_type: ev.event_type,
-        affected_aircraft: ev.affected_aircraft,
-        affected_airport: ev.affected_airport,
-        affected_flight_id: ev.affected_flight_id,
-        start_time: new Date(ev.start_time),
-        end_time: new Date(ev.end_time),
-        severity: ev.severity,
-        description: ev.description ?? "",
-      }
-    : null;
+    const schedule: FlightLeg[] = (flights ?? []).map((row: FlightRow) => ({
+      flight_id: row.flight_id,
+      flight_number: row.flight_number,
+      origin: row.origin,
+      destination: row.destination,
+      std: new Date(row.std),
+      sta: new Date(row.sta),
+      aircraft_id: row.aircraft_id,
+      aircraft_type: row.aircraft_type,
+      priority_level: row.priority_level,
+      load_factor: Number(row.load_factor),
+      is_international: row.is_international,
+      is_last_flight_of_day: row.is_last_flight_of_day,
+    }));
 
-  return { schedule, aircraft, disruption };
+    const aircraft: Aircraft[] = (planes ?? []).map((row: AircraftRow) => ({
+      aircraft_id: row.aircraft_id,
+      aircraft_type: row.aircraft_type,
+      current_station: row.current_station,
+      available_from: new Date(row.available_from),
+      status: row.status,
+      next_maintenance_time: row.next_maintenance_time
+        ? new Date(row.next_maintenance_time)
+        : null,
+      restriction: row.restriction,
+    }));
+
+    const ev = events?.[0] as DisruptionRow | undefined;
+    const disruption: DisruptionEvent | null = ev
+      ? {
+          event_id: ev.event_id,
+          event_type: ev.event_type,
+          affected_aircraft: ev.affected_aircraft,
+          affected_airport: ev.affected_airport,
+          affected_flight_id: ev.affected_flight_id,
+          start_time: new Date(ev.start_time),
+          end_time: new Date(ev.end_time),
+          severity: ev.severity,
+          description: ev.description ?? "",
+        }
+      : null;
+
+    return { data: { schedule, aircraft, disruption }, error: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return {
+      data: null,
+      error: {
+        message: "Failed to load operational data from Supabase.",
+        issues: [{ source: "flights", message }],
+      },
+    };
+  }
 }
 
 export interface SimulationListItem {
@@ -197,7 +276,11 @@ export interface SimulationDetail {
   uuid: string;
   created_at: string;
   result: SimulationResult;
-  options: (RecoveryOption & { approved: boolean })[];
+  options: (RecoveryOption & {
+    approved: boolean;
+    approved_at: string | null;
+    approved_by_email: string | null;
+  })[];
 }
 
 export async function getSimulation(uuid: string): Promise<SimulationDetail | null> {
@@ -229,7 +312,26 @@ export async function getSimulation(uuid: string): Promise<SimulationDetail | nu
     flight_changes: RecoveryOption["flight_changes"] | null;
     aircraft_changes: Record<string, string> | null;
     approved: boolean;
+    approved_at: string | null;
+    approved_by: string | null;
   };
+  const approverIds = Array.from(
+    new Set(
+      (data.recovery_options ?? [])
+        .map((o) => (o as StoredOption).approved_by)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  let approverEmailMap = new Map<string, string>();
+  if (approverIds.length) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .in("id", approverIds);
+    approverEmailMap = new Map(
+      (profiles ?? []).map((p) => [p.id as string, p.email as string]),
+    );
+  }
   const options: SimulationDetail["options"] = (data.recovery_options ?? []).map(
     (o: StoredOption) => ({
       option_id: o.option_id,
@@ -254,6 +356,10 @@ export async function getSimulation(uuid: string): Promise<SimulationDetail | nu
       })),
       aircraft_changes: o.aircraft_changes ?? {},
       approved: o.approved ?? false,
+      approved_at: o.approved_at ?? null,
+      approved_by_email: o.approved_by
+        ? approverEmailMap.get(o.approved_by) ?? null
+        : null,
     }),
   );
   return { uuid: data.uuid, created_at: data.created_at, result, options };
@@ -262,6 +368,7 @@ export async function getSimulation(uuid: string): Promise<SimulationDetail | nu
 function reviveResult(raw: SimulationResult): SimulationResult {
   return {
     ...raw,
+    feedback: raw.feedback ?? null,
     event: {
       ...raw.event,
       start_time: new Date(raw.event.start_time),

@@ -6,6 +6,11 @@ import type {
   RiskLevel,
 } from "@/lib/types";
 import { addMinutes, minTurnaroundForType, overlaps } from "./time-utils";
+import {
+  getAircraftRotation,
+  resolveScheduleIndex,
+  type ScheduleIndex,
+} from "./schedule-index";
 
 function compatibleTypes(
   targetType: string,
@@ -20,13 +25,42 @@ function compatibleTypes(
 function hasConflict(
   candidate: Aircraft,
   target: FlightLeg,
-  schedule: FlightLeg[],
+  scheduleIndex: ScheduleIndex,
 ): boolean {
-  return schedule.some(
-    (f) =>
-      f.aircraft_id === candidate.aircraft_id &&
-      overlaps(f.std, f.sta, target.std, target.sta),
+  return getAircraftRotation(scheduleIndex, candidate.aircraft_id).some((f) =>
+    overlaps(f.std, f.sta, target.std, target.sta),
   );
+}
+
+/**
+ * Derive the **projected station** of an aircraft at a given point in time
+ * by examining its rotation in the schedule.
+ *
+ * 1. Find the latest flight whose STA ≤ `atTime` — the aircraft is at that
+ *    flight's destination after landing.
+ * 2. If no such flight exists (the aircraft hasn't flown yet, or it's a
+ *    standby/reserve), fall back to the static `current_station` field
+ *    from the Aircraft CSV.
+ *
+ * This is critical for real operational data where the CSV snapshot records
+ * the aircraft's station at file-creation time, not at disruption time.
+ */
+export function getProjectedStation(
+  aircraftId: string,
+  atTime: Date,
+  scheduleIndex: ScheduleIndex,
+  fallbackStation: string,
+): string {
+  const rotation = getAircraftRotation(scheduleIndex, aircraftId);
+  let lastLanded: FlightLeg | null = null;
+  for (const flight of rotation) {
+    if (flight.sta <= atTime) {
+      if (!lastLanded || flight.sta > lastLanded.sta) {
+        lastLanded = flight;
+      }
+    }
+  }
+  return lastLanded ? lastLanded.destination : fallbackStation;
 }
 
 export function findCandidateAircraft(
@@ -34,7 +68,9 @@ export function findCandidateAircraft(
   aircraftList: Aircraft[],
   schedule: FlightLeg[],
   rules: OccRules,
+  scheduleIndex?: ScheduleIndex,
 ): CandidateAircraft[] {
+  const index = resolveScheduleIndex(schedule, scheduleIndex);
   const candidates: CandidateAircraft[] = [];
   const minTurn = minTurnaroundForType(targetFlight.aircraft_type, rules);
   const requiredAvailableTime = addMinutes(targetFlight.std, -minTurn);
@@ -61,14 +97,21 @@ export function findCandidateAircraft(
       reasons.push("Aircraft type compatible");
     }
 
-    if (ac.current_station !== targetFlight.origin) {
+    // --- FIX: use projected station from schedule instead of static CSV ---
+    const projectedStation = getProjectedStation(
+      ac.aircraft_id,
+      targetFlight.std,
+      index,
+      ac.current_station,
+    );
+    if (projectedStation !== targetFlight.origin) {
       feasible = false;
       if (risk !== "HIGH") risk = "MEDIUM";
       reasons.push(
-        `Aircraft at ${ac.current_station}, target origin is ${targetFlight.origin}`,
+        `Aircraft projected at ${projectedStation} (CSV: ${ac.current_station}), target origin is ${targetFlight.origin}`,
       );
     } else {
-      reasons.push(`Aircraft available at target origin ${targetFlight.origin}`);
+      reasons.push(`Aircraft projected at target origin ${targetFlight.origin}`);
     }
 
     if (ac.available_from > requiredAvailableTime) {
@@ -81,7 +124,7 @@ export function findCandidateAircraft(
       reasons.push("Availability satisfies turnaround requirement");
     }
 
-    if (hasConflict(ac, targetFlight, schedule)) {
+    if (hasConflict(ac, targetFlight, index)) {
       feasible = false;
       risk = "HIGH";
       reasons.push("Schedule conflict with candidate aircraft existing assignment");

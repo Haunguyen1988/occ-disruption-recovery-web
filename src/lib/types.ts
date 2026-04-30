@@ -66,6 +66,24 @@ export interface CandidateAircraft {
   reason_codes: string[];
 }
 
+export interface SwapCandidateDiagnostic {
+  aircraft_id: string;
+  aircraft_type: string;
+  feasible: boolean;
+  risk_level: RiskLevel;
+  blocking_reason: string | null;
+  reason_codes: string[];
+}
+
+export interface SimulationFeedback {
+  swap_target_flight_id: string | null;
+  swap_target_flight_number: string | null;
+  swap_target_aircraft_id: string | null;
+  feasible_swap_count: number;
+  candidate_count: number;
+  candidates: SwapCandidateDiagnostic[];
+}
+
 export interface FlightChange {
   flight_id: string;
   flight_number: string;

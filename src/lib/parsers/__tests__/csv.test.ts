@@ -67,8 +67,10 @@ describe("parseScheduleRows", () => {
       {
         ...goodRow,
         flight_id: "FL002",
-        std: "2026-04-28T09:00:00Z",
-        sta: "2026-04-28T08:00:00Z",
+        origin: "SGN",
+        destination: "HAN",
+        std: "2026-04-28T14:00:00",
+        sta: "2026-04-28T14:00:00",
       },
     ]);
     expect(r.data.map((d) => d.flight_id)).toEqual(["FL001"]);
@@ -98,9 +100,6 @@ describe("parseScheduleRows", () => {
   });
 
   it("matches the UAT broken-schedule fixture: 4 BAD rows dropped, 2 OK rows kept", () => {
-    // Mirror of public/uat/uat_scenario_broken_schedule.csv — anchors the
-    // smoke-test expectation that preview = save set (no \"imported with
-    // warnings\" middle state).
     const rows = [
       { ...goodRow, flight_id: "UAT-OK-001", flight_number: "VJ900" },
       { ...goodRow, flight_id: "UAT-BAD-001", flight_number: "VJ901", origin: "sgn" },
@@ -109,8 +108,10 @@ describe("parseScheduleRows", () => {
         ...goodRow,
         flight_id: "UAT-BAD-003",
         flight_number: "VJ903",
-        std: "2026-04-28T09:00:00Z",
-        sta: "2026-04-28T08:00:00Z",
+        origin: "SGN",
+        destination: "HAN",
+        std: "2026-04-28T14:00:00",
+        sta: "2026-04-28T14:00:00",
       },
       {
         ...goodRow,

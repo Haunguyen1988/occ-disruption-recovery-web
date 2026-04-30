@@ -5,21 +5,25 @@ import type {
   ImpactedFlight,
   OccRules,
   RecoveryOption,
+  SimulationFeedback,
 } from "@/lib/types";
 import { findImpactedFlights } from "./impact-detector";
 import { rankRecoveryOptions } from "./option-scorer";
 import { generateRecoveryOptions } from "./recovery-option-generator";
+import { buildScheduleIndex } from "./schedule-index";
 
 export interface SimulationResult {
   event: DisruptionEvent;
   impacted_flights: ImpactedFlight[];
   ranked_options: RecoveryOption[];
+  feedback: SimulationFeedback | null;
 }
 
 export interface MultiSimulationResult {
   events: DisruptionEvent[];
   impacted_flights: ImpactedFlight[];
   ranked_options: RecoveryOption[];
+  feedback: SimulationFeedback | null;
 }
 
 export function runSimulation(input: {
@@ -29,19 +33,27 @@ export function runSimulation(input: {
   rules: OccRules;
 }): SimulationResult {
   const { schedule, aircraft, disruption, rules } = input;
-  const impacted = findImpactedFlights(disruption, schedule, rules);
-  const options = generateRecoveryOptions(
+  const scheduleIndex = buildScheduleIndex(schedule);
+  const impacted = findImpactedFlights(
+    disruption,
+    schedule,
+    rules,
+    scheduleIndex,
+  );
+  const generated = generateRecoveryOptions(
     impacted,
     disruption,
     schedule,
     aircraft,
     rules,
+    scheduleIndex,
   );
-  const ranked = rankRecoveryOptions(options, rules);
+  const ranked = rankRecoveryOptions(generated.options, rules, schedule);
   return {
     event: disruption,
     impacted_flights: impacted,
     ranked_options: ranked,
+    feedback: generated.feedback,
   };
 }
 
@@ -66,27 +78,39 @@ export function runMultiEventSimulation(input: {
   const { schedule, aircraft, disruptions, rules } = input;
 
   if (disruptions.length === 0) {
-    return { events: [], impacted_flights: [], ranked_options: [] };
+    return { events: [], impacted_flights: [], ranked_options: [], feedback: null };
   }
 
+  const scheduleIndex = buildScheduleIndex(schedule);
+
   if (disruptions.length === 1) {
-    const single = runSimulation({
+    const impacted = findImpactedFlights(
+      disruptions[0],
+      schedule,
+      rules,
+      scheduleIndex,
+    );
+    const generated = generateRecoveryOptions(
+      impacted,
+      disruptions[0],
       schedule,
       aircraft,
-      disruption: disruptions[0],
       rules,
-    });
+      scheduleIndex,
+    );
+    const ranked = rankRecoveryOptions(generated.options, rules, schedule);
     return {
       events: [disruptions[0]],
-      impacted_flights: single.impacted_flights,
-      ranked_options: single.ranked_options,
+      impacted_flights: impacted,
+      ranked_options: ranked,
+      feedback: generated.feedback,
     };
   }
 
   // 1. Union of impacted flights with merged reason codes.
   const impactedById = new Map<string, ImpactedFlight>();
   for (const event of disruptions) {
-    for (const im of findImpactedFlights(event, schedule, rules)) {
+    for (const im of findImpactedFlights(event, schedule, rules, scheduleIndex)) {
       const key = im.flight.flight_id;
       const existing = impactedById.get(key);
       if (existing) {
@@ -105,7 +129,7 @@ export function runMultiEventSimulation(input: {
   }
   const impacted = [...impactedById.values()];
   if (impacted.length === 0) {
-    return { events: disruptions, impacted_flights: [], ranked_options: [] };
+    return { events: disruptions, impacted_flights: [], ranked_options: [], feedback: null };
   }
 
   // 2. Combined disruption window — start = earliest, end = latest.
@@ -133,19 +157,21 @@ export function runMultiEventSimulation(input: {
     (a) => !excluded.has(a.aircraft_id),
   );
 
-  const options = generateRecoveryOptions(
+  const generated = generateRecoveryOptions(
     impacted,
     combined,
     schedule,
     usableAircraft,
     rules,
+    scheduleIndex,
   );
-  const ranked = rankRecoveryOptions(options, rules);
+  const ranked = rankRecoveryOptions(generated.options, rules, schedule);
 
   return {
     events: disruptions,
     impacted_flights: impacted,
     ranked_options: ranked,
+    feedback: generated.feedback,
   };
 }
 
@@ -158,6 +184,7 @@ export {
 } from "./delay-simulator";
 export { generateRecoveryOptions } from "./recovery-option-generator";
 export { rankRecoveryOptions, calculateRecoveryScore } from "./option-scorer";
+export { buildScheduleIndex } from "./schedule-index";
 export {
   isInCurfew,
   getAirportUtcOffsetHours,

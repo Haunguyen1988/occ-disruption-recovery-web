@@ -1,4 +1,4 @@
-import type { OccRules, RecoveryOption } from "@/lib/types";
+import type { FlightLeg, OccRules, RecoveryOption } from "@/lib/types";
 import { isInCurfew } from "./time-utils";
 
 /**
@@ -23,9 +23,97 @@ function countCurfewViolations(
   return count;
 }
 
+/**
+ * Priority protection penalty (S5 fix + multi-criteria upgrade).
+ *
+ * When a recovery option delays or re-assigns flights that carry priority
+ * attributes (international, last-flight-of-day, high-load-factor), the
+ * option receives an additional penalty so the scorer prefers options that
+ * protect those flights.
+ *
+ * The `schedule` parameter is optional for backwards-compatibility; when
+ * omitted, the protection bonus is simply 0.
+ */
+function calculatePriorityPenalty(
+  option: RecoveryOption,
+  rules: OccRules,
+  schedule?: FlightLeg[],
+): number {
+  if (!schedule || !schedule.length) return 0;
+
+  const protectionBonus =
+    rules.score_weights?.priority_protection_bonus ?? 40;
+  const pr = rules.priority_rules;
+  if (!pr) return 0;
+
+  const flightById = new Map<string, FlightLeg>();
+  for (const f of schedule) flightById.set(f.flight_id, f);
+
+  let penalty = 0;
+  for (const change of option.flight_changes) {
+    // Only penalize changes that actually disrupt the flight
+    if (change.delay_minutes <= 0 && change.original_aircraft === change.new_aircraft) {
+      continue;
+    }
+    const orig = flightById.get(change.flight_id);
+    if (!orig) continue;
+
+    if (pr.protect_international_flight && orig.is_international) {
+      penalty += protectionBonus;
+    }
+    if (pr.protect_last_flight_of_day && orig.is_last_flight_of_day) {
+      penalty += protectionBonus;
+    }
+    if (
+      pr.protect_high_load_factor &&
+      orig.load_factor >= (pr.high_load_factor_threshold ?? 0.85)
+    ) {
+      penalty += Math.round(protectionBonus * 0.5);
+    }
+  }
+  return penalty;
+}
+
+/**
+ * Downstream ripple estimate (Phase 3 — network cost element).
+ *
+ * Estimates how much additional delay an option's changes will cause on
+ * OTHER aircraft sharing the same stations. This approximation counts
+ * station-time conflicts rather than doing a full network re-simulation.
+ */
+function estimateDownstreamRipple(
+  option: RecoveryOption,
+  schedule?: FlightLeg[],
+): number {
+  if (!schedule || !schedule.length) return 0;
+
+  // Build a map of (station, hour) → number of movements
+  const stationLoad = new Map<string, number>();
+  for (const f of schedule) {
+    const depKey = `${f.origin}:${Math.floor(f.std.getTime() / 3600000)}`;
+    const arrKey = `${f.destination}:${Math.floor(f.sta.getTime() / 3600000)}`;
+    stationLoad.set(depKey, (stationLoad.get(depKey) ?? 0) + 1);
+    stationLoad.set(arrKey, (stationLoad.get(arrKey) ?? 0) + 1);
+  }
+
+  let ripple = 0;
+  for (const change of option.flight_changes) {
+    if (change.delay_minutes <= 0) continue;
+    // If the new departure time shifts into a busy hour slot, add ripple cost
+    const newDepKey = `${change.origin}:${Math.floor(change.new_std.getTime() / 3600000)}`;
+    const congestion = stationLoad.get(newDepKey) ?? 0;
+    // More flights at the same station+hour = higher ripple risk
+    if (congestion > 2) {
+      ripple += change.delay_minutes * (congestion - 2) * 0.3;
+    }
+  }
+  return Math.round(ripple);
+}
+
 export function calculateRecoveryScore(
   option: RecoveryOption,
   rules: OccRules,
+  schedule?: FlightLeg[],
 ): RecoveryOption {
   const w = rules.score_weights ?? ({} as OccRules["score_weights"]);
   const totalDelayWeight = w.total_delay_weight ?? 1.0;
@@ -56,9 +144,18 @@ export function calculateRecoveryScore(
   if (option.risk_level === "MEDIUM") riskPenalty = 30;
   else if (option.risk_level === "HIGH") riskPenalty = 100;
 
+  // S5: priority protection penalty
+  const priorityPenalty = calculatePriorityPenalty(option, rules, schedule);
+
+  // Phase 3: downstream ripple estimate
+  const rippleEstimate = estimateDownstreamRipple(option, schedule);
+
   if (option.option_type === "SPREAD_DELAY") baseScore *= 0.95;
 
-  option.score = Math.round((baseScore + riskPenalty) * 100) / 100;
+  option.score =
+    Math.round(
+      (baseScore + riskPenalty + priorityPenalty + rippleEstimate) * 100,
+    ) / 100;
   option.score_breakdown = {
     total_delay_component: option.total_delay_minutes * totalDelayWeight,
     max_delay_component: option.max_delay_minutes * maxDelayWeight,
@@ -66,6 +163,8 @@ export function calculateRecoveryScore(
     swap_component: option.swap_count * swapPenalty,
     curfew_component: curfewViolations * curfewWeight,
     risk_penalty: riskPenalty,
+    priority_protection_penalty: priorityPenalty,
+    downstream_ripple_estimate: rippleEstimate,
   };
   return option;
 }
@@ -73,8 +172,9 @@ export function calculateRecoveryScore(
 export function rankRecoveryOptions(
   options: RecoveryOption[],
   rules: OccRules,
+  schedule?: FlightLeg[],
 ): RecoveryOption[] {
-  const scored = options.map((o) => calculateRecoveryScore(o, rules));
+  const scored = options.map((o) => calculateRecoveryScore(o, rules, schedule));
   const ranked = [...scored].sort((a, b) => a.score - b.score);
   ranked.forEach((option, idx) => {
     option.rank = idx + 1;

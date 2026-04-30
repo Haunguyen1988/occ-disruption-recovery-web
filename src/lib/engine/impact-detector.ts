@@ -5,24 +5,12 @@ import type {
   OccRules,
 } from "@/lib/types";
 import { overlaps } from "./time-utils";
-
-function sortByAircraftRotation(
-  schedule: FlightLeg[],
-): Map<string, FlightLeg[]> {
-  const rotations = new Map<string, FlightLeg[]>();
-  for (const flight of schedule) {
-    const list = rotations.get(flight.aircraft_id) ?? [];
-    list.push(flight);
-    rotations.set(flight.aircraft_id, list);
-  }
-  for (const [acId, list] of rotations) {
-    rotations.set(
-      acId,
-      [...list].sort((a, b) => a.std.getTime() - b.std.getTime()),
-    );
-  }
-  return rotations;
-}
+import { getProjectedStation } from "./candidate-finder";
+import {
+  getAircraftRotation,
+  resolveScheduleIndex,
+  type ScheduleIndex,
+} from "./schedule-index";
 
 /**
  * Find flights impacted by a disruption event.
@@ -36,17 +24,19 @@ export function findImpactedFlights(
   disruption: DisruptionEvent,
   schedule: FlightLeg[],
   _rules?: OccRules,
+  scheduleIndex?: ScheduleIndex,
 ): ImpactedFlight[] {
   // Rules reserved for future curfew/closure-aware impact detection.
   void _rules;
+  const index = resolveScheduleIndex(schedule, scheduleIndex);
   switch (disruption.event_type) {
     case "AOG":
-      return findAogImpacts(disruption, schedule);
+      return findAogImpacts(disruption, index);
     case "AIRPORT_CLOSE":
     case "WEATHER":
-      return findAirportImpacts(disruption, schedule);
+      return findAirportImpacts(disruption, index);
     case "LATE_ARRIVAL":
-      return findLateArrivalImpacts(disruption, schedule);
+      return findLateArrivalImpacts(disruption, index);
     default:
       return [];
   }
@@ -54,36 +44,50 @@ export function findImpactedFlights(
 
 function findAogImpacts(
   disruption: DisruptionEvent,
-  schedule: FlightLeg[],
+  scheduleIndex: ScheduleIndex,
 ): ImpactedFlight[] {
   if (!disruption.affected_aircraft) return [];
-  const rotation =
-    sortByAircraftRotation(schedule).get(disruption.affected_aircraft) ?? [];
+  const rotation = getAircraftRotation(
+    scheduleIndex,
+    disruption.affected_aircraft,
+  );
   const impacted: ImpactedFlight[] = [];
-  let downstreamStarted = false;
+
+  // Validate: check where the aircraft actually is at AOG start time
+  const projStation = getProjectedStation(
+    disruption.affected_aircraft,
+    disruption.start_time,
+    scheduleIndex,
+    disruption.affected_airport ?? "",
+  );
+  const stationNote = disruption.affected_airport && projStation !== disruption.affected_airport
+    ? `⚠️ Aircraft projected at ${projStation}, not ${disruption.affected_airport} — verify AOG location`
+    : `Aircraft at ${projStation} when AOG reported`;
+
   for (const flight of rotation) {
+    // A flight is impacted ONLY if:
+    //   1) Its time range overlaps the AOG window, OR
+    //   2) Its STD falls within the AOG window
+    // Flights departing AFTER end_time are NOT impacted — aircraft is repaired.
     const directOverlap = overlaps(
       flight.std,
       flight.sta,
       disruption.start_time,
       disruption.end_time,
     );
-    // Bug fix K1: a flight whose STD is strictly after end_time and has no
-    // preceding overlap is NOT impacted (aircraft is back in service).
     const startsDuring =
       flight.std >= disruption.start_time &&
       flight.std < disruption.end_time;
-    const shouldImpact = directOverlap || startsDuring || downstreamStarted;
-    if (shouldImpact) {
-      downstreamStarted = true;
-      const reasons = [
-        `AOG aircraft ${disruption.affected_aircraft} unavailable from ${disruption.start_time.toISOString()} to ${disruption.end_time.toISOString()}`,
-        `Flight ${flight.flight_number} assigned to affected aircraft`,
-      ];
-      if (!directOverlap && !startsDuring) {
-        reasons.push("Downstream rotation may be impacted");
-      }
-      impacted.push({ flight, reason_codes: reasons });
+
+    if (directOverlap || startsDuring) {
+      impacted.push({
+        flight,
+        reason_codes: [
+          `AOG aircraft ${disruption.affected_aircraft} unavailable from ${disruption.start_time.toISOString()} to ${disruption.end_time.toISOString()}`,
+          `Flight ${flight.flight_number} (${flight.origin}→${flight.destination}) STD ${flight.std.toISOString()} falls within AOG window`,
+          stationNote,
+        ],
+      });
     }
   }
   return impacted;
@@ -91,17 +95,14 @@ function findAogImpacts(
 
 function findAirportImpacts(
   disruption: DisruptionEvent,
-  schedule: FlightLeg[],
+  scheduleIndex: ScheduleIndex,
 ): ImpactedFlight[] {
   if (!disruption.affected_airport) return [];
   const airport = disruption.affected_airport;
   const eventLabel =
     disruption.event_type === "WEATHER" ? "Weather risk" : "Airport closure";
   const impacted: ImpactedFlight[] = [];
-  const sorted = [...schedule].sort(
-    (a, b) => a.std.getTime() - b.std.getTime(),
-  );
-  for (const flight of sorted) {
+  for (const flight of scheduleIndex.flightsByStd) {
     const departureBlocked =
       flight.origin === airport &&
       flight.std >= disruption.start_time &&
@@ -126,16 +127,12 @@ function findAirportImpacts(
 
 function findLateArrivalImpacts(
   disruption: DisruptionEvent,
-  schedule: FlightLeg[],
+  scheduleIndex: ScheduleIndex,
 ): ImpactedFlight[] {
   if (!disruption.affected_flight_id) return [];
-  const affected = schedule.find(
-    (f) => f.flight_id === disruption.affected_flight_id,
-  );
+  const affected = scheduleIndex.flightsById.get(disruption.affected_flight_id);
   if (!affected) return [];
-  const rotation = schedule
-    .filter((f) => f.aircraft_id === affected.aircraft_id)
-    .sort((a, b) => a.std.getTime() - b.std.getTime());
+  const rotation = getAircraftRotation(scheduleIndex, affected.aircraft_id);
   const impacted: ImpactedFlight[] = [];
   let downstreamStarted = false;
   for (const flight of rotation) {

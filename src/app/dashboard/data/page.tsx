@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useData } from "@/components/data-context";
 import { cn, formatAirportLocal, formatDateTime } from "@/lib/utils";
 import {
@@ -14,6 +14,8 @@ import {
   TEMPLATE_SCHEDULE_CSV,
   type ValidationIssue,
 } from "@/lib/parsers/csv";
+
+const PREVIEW_PAGE_SIZE = 100;
 
 export default function DataPage() {
   const {
@@ -34,6 +36,8 @@ export default function DataPage() {
   const [pasteOpen, setPasteOpen] = useState<
     null | "schedule" | "aircraft" | "disruption"
   >(null);
+  const [schedulePage, setSchedulePage] = useState(1);
+  const [aircraftPage, setAircraftPage] = useState(1);
 
   const canWrite = session?.role === "controller" || session?.role === "admin";
   const allParseErrors = [
@@ -43,6 +47,27 @@ export default function DataPage() {
   ].filter((i) => i.level === "error");
   const hasErrors =
     validation.some((v) => v.level === "error") || allParseErrors.length > 0;
+
+  const schedulePageCount = Math.max(
+    1,
+    Math.ceil(schedule.length / PREVIEW_PAGE_SIZE),
+  );
+  const aircraftPageCount = Math.max(
+    1,
+    Math.ceil(aircraft.length / PREVIEW_PAGE_SIZE),
+  );
+  const safeSchedulePage = Math.min(schedulePage, schedulePageCount);
+  const safeAircraftPage = Math.min(aircraftPage, aircraftPageCount);
+  const scheduleStart = (safeSchedulePage - 1) * PREVIEW_PAGE_SIZE;
+  const aircraftStart = (safeAircraftPage - 1) * PREVIEW_PAGE_SIZE;
+  const visibleSchedule = useMemo(
+    () => schedule.slice(scheduleStart, scheduleStart + PREVIEW_PAGE_SIZE),
+    [schedule, scheduleStart],
+  );
+  const visibleAircraft = useMemo(
+    () => aircraft.slice(aircraftStart, aircraftStart + PREVIEW_PAGE_SIZE),
+    [aircraft, aircraftStart],
+  );
 
   async function handleSaveAll() {
     setSaving(true);
@@ -94,9 +119,16 @@ export default function DataPage() {
         : text;
       const blob = new Blob([csv], { type: "text/csv" });
       const file = new File([blob], `pasted_${kind}.csv`, { type: "text/csv" });
-      if (kind === "schedule") await loadScheduleFile(file);
-      else if (kind === "aircraft") await loadAircraftFile(file);
-      else await loadDisruptionFile(file);
+      if (kind === "schedule") {
+        await loadScheduleFile(file);
+        setSchedulePage(1);
+        setAircraftPage(1);
+      } else if (kind === "aircraft") {
+        await loadAircraftFile(file);
+        setAircraftPage(1);
+      } else {
+        await loadDisruptionFile(file);
+      }
     } catch (e) {
       setError(`${kind} paste error: ${(e as Error).message}`);
     }
@@ -159,6 +191,8 @@ export default function DataPage() {
             setError(null);
             try {
               await loadScheduleFile(f);
+              setSchedulePage(1);
+              setAircraftPage(1);
             } catch (e) {
               setError(`Schedule parse error: ${(e as Error).message}`);
             }
@@ -176,6 +210,7 @@ export default function DataPage() {
             setError(null);
             try {
               await loadAircraftFile(f);
+              setAircraftPage(1);
             } catch (e) {
               setError(`Aircraft parse error: ${(e as Error).message}`);
             }
@@ -251,7 +286,16 @@ export default function DataPage() {
       )}
 
       <section>
-        <h2 className="font-semibold mb-2">Schedule preview</h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Schedule preview</h2>
+          <PaginationControls
+            page={safeSchedulePage}
+            pageCount={schedulePageCount}
+            pageSize={PREVIEW_PAGE_SIZE}
+            total={schedule.length}
+            onPageChange={setSchedulePage}
+          />
+        </div>
         <div className="rounded-lg border border-border overflow-x-auto">
           <table className="w-full text-xs font-mono">
             <thead className="bg-muted text-left">
@@ -266,9 +310,9 @@ export default function DataPage() {
               </tr>
             </thead>
             <tbody>
-              {schedule.map((f, idx) => (
+              {visibleSchedule.map((f, idx) => (
                 <tr
-                  key={`${idx}-${f.flight_id}`}
+                  key={`${scheduleStart + idx}-${f.flight_id}`}
                   className="border-t border-border"
                 >
                   <td className="p-2">{f.flight_number}</td>
@@ -294,7 +338,16 @@ export default function DataPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold mb-2">Aircraft preview</h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Aircraft preview</h2>
+          <PaginationControls
+            page={safeAircraftPage}
+            pageCount={aircraftPageCount}
+            pageSize={PREVIEW_PAGE_SIZE}
+            total={aircraft.length}
+            onPageChange={setAircraftPage}
+          />
+        </div>
         <div className="rounded-lg border border-border overflow-x-auto">
           <table className="w-full text-xs font-mono">
             <thead className="bg-muted text-left">
@@ -309,9 +362,9 @@ export default function DataPage() {
               </tr>
             </thead>
             <tbody>
-              {aircraft.map((a, idx) => (
+              {visibleAircraft.map((a, idx) => (
                 <tr
-                  key={`${idx}-${a.aircraft_id}`}
+                  key={`${aircraftStart + idx}-${a.aircraft_id}`}
                   className="border-t border-border"
                 >
                   <td className="p-2">{a.aircraft_id}</td>
@@ -333,6 +386,52 @@ export default function DataPage() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PaginationControls({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (total <= pageSize) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return (
+    <div className="flex items-center gap-2 text-xs text-zinc-500">
+      <span>
+        Showing {start}-{end} of {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="h-7 rounded border border-border px-2 hover:bg-muted disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <span className="font-mono">
+          {page}/{pageCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+          disabled={page >= pageCount}
+          className="h-7 rounded border border-border px-2 hover:bg-muted disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

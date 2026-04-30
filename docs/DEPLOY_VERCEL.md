@@ -32,7 +32,7 @@ Project → **Settings → Domains** → add e.g. `occ.vietjet.internal` (you'll
 
 ## 5. Production checklist before sharing the URL with users
 
-- [ ] Run `supabase/migrations/0001_init.sql` against the Supabase project (one-time, idempotent).
+- [ ] Run `supabase/migrations/0001_init.sql`, `0002_curfew_and_multi_event.sql`, and `0003_approval_safety.sql` against the Supabase project in order.
 - [ ] Create the user accounts in Supabase Dashboard → **Authentication → Users**.
 - [ ] Set roles: in the SQL editor —
   ```sql

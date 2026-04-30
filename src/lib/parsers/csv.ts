@@ -7,6 +7,7 @@ import type {
   FlightLeg,
   Severity,
 } from "@/lib/types";
+import { getAirportTimezone, localToUtc } from "@/lib/engine/time-utils";
 
 // ---------------------------------------------------------------------------
 // Issue model — per-row, per-column error reporting (Sprint 5 hardening)
@@ -67,6 +68,12 @@ const DISRUPTION_REQUIRED = [
 // Low-level parsing helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse a date/time value. If the string has an explicit timezone (Z or +HH:MM),
+ * it is respected. Otherwise the datetime is treated as UTC.
+ * For schedule STD/STA which are local station times, use parseLocalDateTime()
+ * + localToUtc() instead.
+ */
 function parseDate(value: unknown): Date {
   if (value instanceof Date) return value;
   if (typeof value === "number") {
@@ -75,10 +82,6 @@ function parseDate(value: unknown): Date {
     return new Date(epoch.getTime() + value * 86400000);
   }
   if (typeof value === "string" && value.trim()) {
-    // Ensure ISO datetimes without a timezone designator are parsed as UTC
-    // (rather than runtime-local). This makes CSV ingestion deterministic
-    // across host machines and matches the convention documented in the
-    // template (`YYYY-MM-DDTHH:MM:SSZ`).
     const v = value.trim();
     const isoNaive =
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v);
@@ -86,6 +89,37 @@ function parseDate(value: unknown): Date {
     if (!Number.isNaN(d.getTime())) return d;
   }
   throw new Error(`Cannot parse date: ${String(value)}`);
+}
+
+/**
+ * Extract calendar date + clock time components from a datetime string
+ * WITHOUT any timezone assumption. Returns {year, month, day, hour, minute}
+ * for use with localToUtc(). Supports:
+ *   - "2026-04-28T07:00:00"   (ISO without tz)
+ *   - "2026-04-28T07:00:00Z"  (Z is stripped — caller provides the real tz)
+ *   - "2026-04-28T07:00"      (no seconds)
+ *   - "2026-04-28 07:00:00"   (space separator)
+ */
+interface LocalDateTime {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+function parseLocalDateTime(value: unknown): LocalDateTime | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().replace(/Z$/i, ""); // strip Z — we use the airport tz
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(v);
+  if (!m) return null;
+  return {
+    year: Number(m[1]),
+    month: Number(m[2]),
+    day: Number(m[3]),
+    hour: Number(m[4]),
+    minute: Number(m[5]),
+  };
 }
 
 function parseDateOrNull(value: unknown): Date | null {
@@ -197,38 +231,7 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
       return;
     }
 
-    let std: Date;
-    let sta: Date;
-    try {
-      std = parseDate(r.std);
-    } catch {
-      issues.push({
-        level: "error",
-        message: `Cannot parse std (use ISO 8601, e.g. 2026-04-28T07:00:00Z)`,
-        row,
-        column: "std",
-        value: String(r.std ?? ""),
-        source: "schedule",
-      });
-      return;
-    }
-    try {
-      sta = parseDate(r.sta);
-    } catch {
-      issues.push({
-        level: "error",
-        message: `Cannot parse sta (use ISO 8601, e.g. 2026-04-28T09:10:00Z)`,
-        row,
-        column: "sta",
-        value: String(r.sta ?? ""),
-        source: "schedule",
-      });
-      return;
-    }
-
-    // Row-level rejection: rows that fail any of these checks are dropped
-    // from the imported set so the preview equals the eventual save set
-    // (no "imported but not saved" middle state).
+    // Row-level rejection: rows that fail any of these checks are dropped.
     let rowBad = false;
 
     const origin = String(r.origin ?? "").trim();
@@ -255,17 +258,81 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
       });
       rowBad = true;
     }
+    if (rowBad) return;
 
-    if (sta <= std) {
+    // -----------------------------------------------------------------------
+    // STD/STA are LOCAL station times:
+    //   - STD is local at ORIGIN
+    //   - STA is local at DESTINATION
+    // We convert both to true UTC using the airport's IANA timezone.
+    // If the value already has an explicit Z or +offset, parseLocalDateTime
+    // strips it — the airport timezone is authoritative for schedule files.
+    // -----------------------------------------------------------------------
+    const stdLocal = parseLocalDateTime(r.std);
+    if (!stdLocal) {
       issues.push({
         level: "error",
-        message: `STA (${sta.toISOString()}) must be after STD (${std.toISOString()})`,
+        message: `Cannot parse std — expected format: 2026-04-28T07:00:00 (local time at origin)`,
+        row,
+        column: "std",
+        value: String(r.std ?? ""),
+        source: "schedule",
+      });
+      return;
+    }
+    const staLocal = parseLocalDateTime(r.sta);
+    if (!staLocal) {
+      issues.push({
+        level: "error",
+        message: `Cannot parse sta — expected format: 2026-04-28T09:10:00 (local time at destination)`,
         row,
         column: "sta",
         value: String(r.sta ?? ""),
         source: "schedule",
       });
-      rowBad = true;
+      return;
+    }
+
+    const originTz = getAirportTimezone(origin);
+    const destTz = getAirportTimezone(destination);
+
+    const std = localToUtc(
+      stdLocal.year, stdLocal.month, stdLocal.day,
+      stdLocal.hour, stdLocal.minute, originTz,
+    );
+
+    // Overnight flights: if STA clock time < STD clock time AND dates are
+    // the same, the arrival is the next day at the destination.
+    let sta: Date;
+    const stdMinOfDay = stdLocal.hour * 60 + stdLocal.minute;
+    const staMinOfDay = staLocal.hour * 60 + staLocal.minute;
+    const sameDate = stdLocal.year === staLocal.year &&
+      stdLocal.month === staLocal.month && stdLocal.day === staLocal.day;
+
+    if (sameDate && staMinOfDay < stdMinOfDay) {
+      // Overnight: advance STA date by 1 day
+      const next = new Date(Date.UTC(staLocal.year, staLocal.month - 1, staLocal.day + 1));
+      sta = localToUtc(
+        next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(),
+        staLocal.hour, staLocal.minute, destTz,
+      );
+    } else {
+      sta = localToUtc(
+        staLocal.year, staLocal.month, staLocal.day,
+        staLocal.hour, staLocal.minute, destTz,
+      );
+    }
+
+    if (sta <= std) {
+      issues.push({
+        level: "error",
+        message: `STA (${sta.toISOString()}) must be after STD (${std.toISOString()}) after local→UTC conversion`,
+        row,
+        column: "sta",
+        value: String(r.sta ?? ""),
+        source: "schedule",
+      });
+      return;
     }
 
     const priorityRaw = r.priority_level ?? 3;
@@ -279,7 +346,7 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
         value: String(priorityRaw),
         source: "schedule",
       });
-      rowBad = true;
+      return;
     }
 
     const loadFactor = Number(r.load_factor ?? 0);
@@ -293,8 +360,6 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
         source: "schedule",
       });
     }
-
-    if (rowBad) return;
 
     data.push({
       flight_id: String(r.flight_id),

@@ -21,7 +21,7 @@ export default function LoginPage() {
     setErr(null);
     if (!supabaseReady) {
       setErr(
-        "Supabase environment variables not configured. Sign-in is disabled in stub mode — go directly to the dashboard.",
+        "Supabase environment variables not configured. Sign-in is disabled in stub mode; go directly to the dashboard.",
       );
       return;
     }
@@ -57,7 +57,7 @@ export default function LoginPage() {
         <p className="text-sm text-zinc-500 mt-1">
           {supabaseReady
             ? "Use your team email to sign in."
-            : "Stub mode — Supabase not configured. You can still open the dashboard."}
+            : "Stub mode - Supabase not configured. You can still open the dashboard."}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-3">
@@ -77,24 +77,24 @@ export default function LoginPage() {
             className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm"
             required
           />
-          {err && (
-            <p className="text-xs text-[color:var(--danger)]">{err}</p>
-          )}
+          {err && <p className="text-xs text-[color:var(--danger)]">{err}</p>}
           <button
             type="submit"
             disabled={busy}
             className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90"
           >
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <Link
-          href="/dashboard"
-          className="mt-4 block text-center text-sm text-zinc-500 hover:underline"
-        >
-          Continue without signing in →
-        </Link>
+        {!supabaseReady && (
+          <Link
+            href="/dashboard"
+            className="mt-4 block text-center text-sm text-zinc-500 hover:underline"
+          >
+            Continue without signing in
+          </Link>
+        )}
       </div>
     </main>
   );
