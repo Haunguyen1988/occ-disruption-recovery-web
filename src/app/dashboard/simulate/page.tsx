@@ -4,8 +4,15 @@ import { useMemo, useRef, useState } from "react";
 import { useData } from "@/components/data-context";
 import { GanttSchedule } from "@/components/gantt-schedule";
 import {
+  analyzeMultiEventConflicts,
+  applyRecoveryObjectiveProfile,
+  getRecoveryObjectiveProfile,
+  RECOVERY_OBJECTIVE_PROFILES,
   runSimulation,
   runMultiEventSimulation,
+  type EventConflictLevel,
+  type MultiEventConflictAnalysis,
+  type RecoveryObjectiveProfile,
   type SimulationResult,
   type TailAssignmentMode,
 } from "@/lib/engine";
@@ -69,10 +76,35 @@ export default function SimulatePage() {
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [tailAssignmentMode, setTailAssignmentMode] =
     useState<TailAssignmentMode>("balanced");
+  const [objectiveProfile, setObjectiveProfile] =
+    useState<RecoveryObjectiveProfile>("balanced");
+  const [resultObjectiveProfile, setResultObjectiveProfile] =
+    useState<RecoveryObjectiveProfile>("balanced");
 
   const hasData = schedule.length > 0 && aircraft.length > 0;
   const canRun = Boolean(hasData && disruption);
   const canWrite = session?.role === "controller" || session?.role === "admin";
+  const objectiveRules = useMemo(
+    () => applyRecoveryObjectiveProfile(rules, objectiveProfile),
+    [rules, objectiveProfile],
+  );
+  const activeObjective = useMemo(
+    () => getRecoveryObjectiveProfile(objectiveProfile),
+    [objectiveProfile],
+  );
+  const resultObjective = useMemo(
+    () => getRecoveryObjectiveProfile(resultObjectiveProfile),
+    [resultObjectiveProfile],
+  );
+  const eventConflictAnalysis = useMemo(
+    () =>
+      analyzeMultiEventConflicts({
+        events: disruption ? [disruption, ...extraEvents] : extraEvents,
+        schedule,
+        rules,
+      }),
+    [disruption, extraEvents, schedule, rules],
+  );
 
   const handleRun = () => {
     if (!disruption) return;
@@ -89,17 +121,18 @@ export default function SimulatePage() {
           schedule,
           aircraft,
           disruption,
-          rules,
+          rules: objectiveRules,
           tailAssignmentMode,
         });
         setResult(r);
+        setResultObjectiveProfile(objectiveProfile);
         setSelectedOption(r.ranked_options[0]?.option_id ?? null);
       } else {
         const multi = runMultiEventSimulation({
           schedule,
           aircraft,
           disruptions: allEvents,
-          rules,
+          rules: objectiveRules,
           tailAssignmentMode,
         });
         // Wrap multi result into SimulationResult shape so existing UI keeps
@@ -111,6 +144,7 @@ export default function SimulatePage() {
           ranked_options: multi.ranked_options,
           feedback: multi.feedback,
         });
+        setResultObjectiveProfile(objectiveProfile);
         setSelectedOption(multi.ranked_options[0]?.option_id ?? null);
       }
     } finally {
@@ -456,6 +490,28 @@ export default function SimulatePage() {
             >
               Change event
             </button>
+            <div className="flex items-center gap-2" title={activeObjective.description}>
+              <span className="text-xs font-medium text-zinc-500">
+                Objective
+              </span>
+              <div className="flex flex-wrap items-center gap-1 rounded-md border border-border p-1">
+                {RECOVERY_OBJECTIVE_PROFILES.map((profile) => (
+                  <button
+                    key={profile.value}
+                    onClick={() => setObjectiveProfile(profile.value)}
+                    className={cn(
+                      "h-7 rounded px-2 text-xs font-medium",
+                      objectiveProfile === profile.value
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted",
+                    )}
+                    title={profile.description}
+                  >
+                    {profile.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-1 rounded-md border border-border p-1">
               {TAIL_ASSIGNMENT_MODES.map((mode) => (
                 <button
@@ -502,6 +558,7 @@ export default function SimulatePage() {
         onDraftChange={setEventDraft}
         onAdd={addExtraEvent}
         onRemove={removeExtraEvent}
+        analysis={eventConflictAnalysis}
       />
 
       {result && (
@@ -557,7 +614,9 @@ export default function SimulatePage() {
                 Ranked recovery options ({result.ranked_options.length})
               </h2>
               <span className="text-xs text-zinc-500 font-normal">
-                Total impacted: {result.impacted_flights.length} flights · {new Set(result.impacted_flights.map((f: ImpactedFlight) => f.flight.aircraft_id)).size} aircraft
+                Objective: {resultObjective.label} · Total impacted:{" "}
+                {result.impacted_flights.length} flights ·{" "}
+                {new Set(result.impacted_flights.map((f: ImpactedFlight) => f.flight.aircraft_id)).size} aircraft
               </span>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-zinc-500">
@@ -1629,6 +1688,181 @@ function draftToEventSimple(
   };
 }
 
+function EventConflictIntelligence({
+  analysis,
+}: {
+  analysis: MultiEventConflictAnalysis;
+}) {
+  if (analysis.event_count === 0) return null;
+
+  const totalImpacted = analysis.event_summaries.reduce(
+    (sum, item) => sum + item.impacted_flight_count,
+    0,
+  );
+  const topConflicts = analysis.conflicts.slice(0, 3);
+
+  return (
+    <div className="mt-3 rounded border border-border bg-muted/20 p-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Event coupling intelligence</h3>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Conflict graph across time windows, aircraft rotations, airports,
+            and impacted flights.
+          </p>
+        </div>
+        <ConflictBadge level={analysis.network_risk_level} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+        <ConflictMetric
+          label="Network score"
+          value={analysis.network_exposure_score.toLocaleString()}
+        />
+        <ConflictMetric
+          label="Impacted flights"
+          value={totalImpacted.toLocaleString()}
+        />
+        <ConflictMetric
+          label="Coupled events"
+          value={`${analysis.coupled_event_count}/${analysis.event_count}`}
+        />
+        <ConflictMetric
+          label="Conflict pairs"
+          value={analysis.conflicts.length.toLocaleString()}
+        />
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded border border-border bg-background/70">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-muted text-zinc-500">
+            <tr>
+              <th className="px-2 py-1.5 font-medium">Event</th>
+              <th className="px-2 py-1.5 font-medium">Impact</th>
+              <th className="px-2 py-1.5 font-medium">Aircraft</th>
+              <th className="px-2 py-1.5 font-medium">Downstream</th>
+              <th className="px-2 py-1.5 font-medium">Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analysis.event_summaries.map((summary) => (
+              <tr key={summary.event_id} className="border-t border-border">
+                <td className="px-2 py-1.5">
+                  <div className="font-mono font-semibold">{summary.event_id}</div>
+                  <div className="text-zinc-500">{summary.event_type}</div>
+                </td>
+                <td className="px-2 py-1.5">
+                  {summary.impacted_flight_count} flight(s)
+                  <div className="text-zinc-500">
+                    {summary.priority_impacted_count} priority
+                  </div>
+                </td>
+                <td className="px-2 py-1.5">
+                  {summary.impacted_aircraft_count}
+                </td>
+                <td className="px-2 py-1.5">
+                  {summary.downstream_exposure_count}
+                </td>
+                <td className="px-2 py-1.5">
+                  <ConflictBadge level={summary.exposure_level} compact />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {topConflicts.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {topConflicts.map((conflict) => (
+            <div
+              key={conflict.event_ids.join(":")}
+              className="rounded border border-border bg-background/70 p-2 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono font-semibold">
+                  {conflict.event_ids.join(" + ")}
+                </span>
+                <ConflictBadge level={conflict.level} compact />
+              </div>
+              <div className="mt-1 text-zinc-600 dark:text-zinc-300">
+                {conflict.reasons.slice(0, 2).join("; ")}
+              </div>
+              {(conflict.shared_aircraft.length > 0 ||
+                conflict.shared_airports.length > 0 ||
+                conflict.shared_flights.length > 0) && (
+                <div className="mt-1 font-mono text-[11px] text-zinc-500">
+                  {conflict.shared_aircraft.length > 0 &&
+                    `A/C ${conflict.shared_aircraft.join(", ")}`}
+                  {conflict.shared_aircraft.length > 0 &&
+                    conflict.shared_airports.length > 0 &&
+                    " · "}
+                  {conflict.shared_airports.length > 0 &&
+                    `APT ${conflict.shared_airports.join(", ")}`}
+                  {(conflict.shared_aircraft.length > 0 ||
+                    conflict.shared_airports.length > 0) &&
+                    conflict.shared_flights.length > 0 &&
+                    " · "}
+                  {conflict.shared_flights.length > 0 &&
+                    `FLT ${conflict.shared_flights.join(", ")}`}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {analysis.recommendations.length > 0 && (
+        <ul className="mt-3 grid gap-1 text-xs text-zinc-700 dark:text-zinc-200 md:grid-cols-2">
+          {analysis.recommendations.map((item) => (
+            <li key={item} className="rounded border border-border/70 px-2 py-1">
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ConflictMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded border border-border bg-background/70 p-2">
+      <div className="text-zinc-500">{label}</div>
+      <div className="mt-1 font-mono text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function ConflictBadge({
+  level,
+  compact = false,
+}: {
+  level: EventConflictLevel;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded px-2 py-0.5 font-mono font-semibold",
+        compact ? "text-[10px]" : "text-[11px]",
+        level === "LOW" && "bg-emerald-100 text-emerald-800",
+        level === "MEDIUM" && "bg-amber-100 text-amber-800",
+        level === "HIGH" && "bg-orange-100 text-orange-800",
+        level === "CRITICAL" && "bg-red-100 text-red-800",
+      )}
+    >
+      {level}
+    </span>
+  );
+}
+
 function MultiEventPanel({
   primary,
   extras,
@@ -1640,6 +1874,7 @@ function MultiEventPanel({
   onDraftChange,
   onAdd,
   onRemove,
+  analysis,
 }: {
   primary: DisruptionEvent | null;
   extras: DisruptionEvent[];
@@ -1651,6 +1886,7 @@ function MultiEventPanel({
   onDraftChange: (d: EventDraft) => void;
   onAdd: () => void;
   onRemove: (eventId: string) => void;
+  analysis: MultiEventConflictAnalysis;
 }) {
   const totalEvents = (primary ? 1 : 0) + extras.length;
 
@@ -1717,6 +1953,8 @@ function MultiEventPanel({
           </li>
         ))}
       </ul>
+
+      <EventConflictIntelligence analysis={analysis} />
 
       {showForm && (
         <div className="mt-3 rounded border border-border p-3 space-y-3 text-sm">

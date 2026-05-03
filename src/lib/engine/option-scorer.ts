@@ -125,6 +125,7 @@ export function calculateRecoveryScore(
   const passengerDelayWeight = w.passenger_delay_weight ?? 0.02;
   const passengerPriorityWeight = w.passenger_priority_weight ?? 15;
   const misconnectRiskPenalty = w.misconnect_risk_penalty ?? 80;
+  const riskPenaltyMultiplier = w.risk_penalty_multiplier ?? 1;
 
   const curfewViolations = countCurfewViolations(option, rules);
   option.curfew_violations = curfewViolations;
@@ -147,6 +148,7 @@ export function calculateRecoveryScore(
   let riskPenalty = 0;
   if (option.risk_level === "MEDIUM") riskPenalty = 30;
   else if (option.risk_level === "HIGH") riskPenalty = 100;
+  riskPenalty *= riskPenaltyMultiplier;
 
   // S5: priority protection penalty
   const priorityPenalty = calculatePriorityPenalty(option, rules, schedule);

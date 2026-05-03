@@ -232,6 +232,20 @@ export {
 } from "./delay-simulator";
 export { generateRecoveryOptions } from "./recovery-option-generator";
 export { rankRecoveryOptions, calculateRecoveryScore } from "./option-scorer";
+export {
+  applyRecoveryObjectiveProfile,
+  getRecoveryObjectiveProfile,
+  RECOVERY_OBJECTIVE_PROFILES,
+} from "./objective-profiles";
+export type { RecoveryObjectiveProfile } from "./objective-profiles";
+export { analyzeMultiEventConflicts } from "./event-conflicts";
+export type {
+  EventConflict,
+  EventConflictGroup,
+  EventConflictLevel,
+  EventImpactSummary,
+  MultiEventConflictAnalysis,
+} from "./event-conflicts";
 export { buildScheduleIndex } from "./schedule-index";
 export { optimizeTailAssignment } from "./tail-assignment";
 export type { AircraftRecoveryObjective, TailAssignmentMode } from "./tail-assignment";

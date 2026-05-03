@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { hasSupabaseEnv, isAuthRequired, isStubModeAllowed } from "./auth-mode";
 
@@ -27,6 +28,23 @@ export async function createSupabaseServerClient() {
 
 export function isSupabaseConfigured(): boolean {
   return hasSupabaseEnv();
+}
+
+export function isSupabaseServiceConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+}
+
+export function createSupabaseServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
 
 export { isAuthRequired, isStubModeAllowed };

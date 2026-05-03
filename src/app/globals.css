@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #f4f4f5;
-  --border: #e4e4e7;
-  --primary: #0f172a;
+  --background: #f7f8fb;
+  --foreground: #101828;
+  --muted: #eef2f6;
+  --border: #d8dee8;
+  --primary: #182230;
   --primary-foreground: #ffffff;
-  --accent: #ea580c;
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
+  --accent: #0f766e;
+  --success: #0f9f6e;
+  --warning: #b7791f;
+  --danger: #d92d20;
+  --panel: #ffffff;
+  --panel-subtle: #f9fafb;
+  --sidebar: #111827;
+  --sidebar-foreground: #f9fafb;
+  --ring-soft: rgba(15, 118, 110, 0.18);
   --font-system-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   --font-system-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
@@ -28,22 +33,49 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-panel: var(--panel);
+  --color-panel-subtle: var(--panel-subtle);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
   --font-sans: var(--font-system-sans);
   --font-mono: var(--font-system-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #18181b;
-    --border: #27272a;
+    --background: #090c12;
+    --foreground: #eef2f6;
+    --muted: #151a24;
+    --border: #273142;
     --primary: #f4f4f5;
-    --primary-foreground: #0a0a0a;
+    --primary-foreground: #0b1220;
+    --accent: #2dd4bf;
+    --panel: #0f1623;
+    --panel-subtle: #111827;
+    --sidebar: #080b10;
+    --sidebar-foreground: #f9fafb;
   }
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(180deg, #fbfcfe 0%, var(--background) 30%, var(--background) 100%);
   color: var(--foreground);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(180deg, #0c111b 0%, var(--background) 36%, var(--background) 100%);
+  }
+}
+
+.surface {
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.06);
+}
+
+.surface-soft {
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-subtle) 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.05);
 }

@@ -238,5 +238,6 @@ export interface OccRules {
     passenger_delay_weight?: number;
     passenger_priority_weight?: number;
     misconnect_risk_penalty?: number;
+    risk_penalty_multiplier?: number;
   };
 }

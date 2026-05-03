@@ -32,9 +32,9 @@ export default async function DashboardLayout({
       initialDisruption={initialData?.disruption ?? null}
       initialOperationalLoadError={operationalLoadError}
     >
-      <div className="flex flex-1 min-h-0">
+      <div className="flex min-h-screen flex-1">
         <Sidebar role={session?.role ?? null} email={session?.email ?? null} />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto px-5 py-5 md:px-8 md:py-7">
           {operationalLoadError && (
             <OperationalLoadErrorBanner error={operationalLoadError} />
           )}

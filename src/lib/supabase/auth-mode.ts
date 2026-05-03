@@ -5,19 +5,24 @@ type SupabaseRuntimeEnv = {
   NODE_ENV?: string;
 };
 
-export function hasSupabaseEnv(): boolean {
+export function hasSupabaseEnv(
+  env: SupabaseRuntimeEnv = process.env,
+): boolean {
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
 }
 
-export function isStubModeAllowed(): boolean {
+export function isStubModeAllowed(
+  env: SupabaseRuntimeEnv = process.env,
+): boolean {
   return (
-    process.env.NEXT_PUBLIC_ALLOW_STUB_MODE === "1" || process.env.NODE_ENV !== "production"
+    env.NEXT_PUBLIC_ALLOW_STUB_MODE === "1" || env.NODE_ENV !== "production"
   );
 }
 
-export function isAuthRequired(): boolean {
-  return hasSupabaseEnv() || !isStubModeAllowed();
+export function isAuthRequired(
+  env: SupabaseRuntimeEnv = process.env,
+): boolean {
+  return hasSupabaseEnv(env) || !isStubModeAllowed(env);
 }
-

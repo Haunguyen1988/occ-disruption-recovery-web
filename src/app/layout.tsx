@@ -21,15 +21,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <main className="flex-grow">
-          {children}
-        </main>
-        <footer className="border-t py-6 bg-slate-50">
-          <div className="max-w-7xl mx-auto px-4 flex justify-between items-center text-sm text-slate-500">
-            <p>© {new Date().getFullYear()} OCC Disruption Recovery. Internal Use Only.</p>
+        <main className="flex-grow">{children}</main>
+        <footer className="border-t border-border bg-panel/80 py-5 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 text-xs text-zinc-500">
+            <p>
+              © {new Date().getFullYear()} OCC Disruption Recovery. Internal use
+              only.
+            </p>
             <div className="space-x-4">
-              <a href="/privacy" className="hover:underline">Privacy</a>
-              <a href="/terms" className="hover:underline">Terms</a>
+              <a href="/privacy" className="hover:text-foreground">
+                Privacy
+              </a>
+              <a href="/terms" className="hover:text-foreground">
+                Terms
+              </a>
             </div>
           </div>
         </footer>

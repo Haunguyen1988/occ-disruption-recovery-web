@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { WeatherWatch } from "@/components/weather-watch";
 import { decodeMetar, evaluateMetar } from "@/lib/decoders/metar";
 import { decodeNotam, evaluateNotam } from "@/lib/decoders/notam";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,8 @@ export default function DecodersPage() {
           minima.
         </p>
       </div>
+
+      <WeatherWatch />
 
       <section className="rounded-lg border border-border p-4 space-y-3">
         <h2 className="font-semibold">METAR / TAF</h2>

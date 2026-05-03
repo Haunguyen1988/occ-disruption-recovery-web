@@ -131,6 +131,7 @@ function validateRules(value: unknown): void {
   requireOptionalNumber(scoreWeights, "passenger_delay_weight");
   requireOptionalNumber(scoreWeights, "passenger_priority_weight");
   requireOptionalNumber(scoreWeights, "misconnect_risk_penalty");
+  requireOptionalNumber(scoreWeights, "risk_penalty_multiplier");
 }
 
 export const DEFAULT_RULES_YAML = `aircraft_rules:
