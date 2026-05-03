@@ -1,6 +1,6 @@
 # Memory Bank
 
-Last updated: 2026-04-30
+Last updated: 2026-05-03
 
 This folder is the project handoff state for future Codex sessions. Start here before changing code.
 
@@ -14,12 +14,26 @@ This folder is the project handoff state for future Codex sessions. Start here b
 
 ## Latest Verification
 
-Commands run on 2026-04-30 after the simulation-feedback improvement:
+Latest release-gate recheck on 2026-05-03:
+
+- `npm.cmd run verify:prod`: passed with escalation after an initial sandbox Vitest `spawn EPERM`. It ran lint, the normal test suite, production build, and deterministic S8 benchmark.
+- Lint was clean with no warnings after removing the unused `createPartialSwapHybrid` helper.
+- Normal tests passed: 15 test files passed plus 1 skipped opt-in benchmark file; 131 tests passed and 1 benchmark test skipped.
+- Production build passed.
+- S8 benchmark result: `UAT-TAIL-001`, balanced mode, 5 flights, 3 aircraft, 1 impacted flight, 7 ranked options, 19 ms runtime, tail rank #1, tail score 2387, best non-tail rank #3, best non-tail score 23215, score delta -20828, 35 -> 9 arcs, 15 paths, 42 search nodes, 1 fixed connection.
+- Before the final pass, a stale `DEEP_DELAY` upgrade-verification assertion was fixed. `DEEP_DELAY` now marks the selected low-priority flight while still carrying the full flight impact plan.
+- Production readiness docs now use the current passenger-scored S8 benchmark values, and the release-notes template captures the full optimizer diagnostics printed by the benchmark.
+
+Earlier commands run on 2026-05-02 after the tail-assignment ranking explanation and S8 UAT-doc alignment pass:
 
 - `npm.cmd run lint`: passed.
-- `npm.cmd run dev`: required escalation because sandboxed `next dev` hit `spawn EPERM`; local server then came up at `http://127.0.0.1:3000`.
-- `npm.cmd test`: passed, 10 test files and 84 tests. The first sandbox run hit `spawn EPERM`; rerun with escalation passed.
-- `npm.cmd run build`: passed. The first sandbox run hit `.next` unlink `EPERM`; rerun with escalation passed.
+- `npm.cmd test`: passed with escalation, 13 test files plus 1 skipped opt-in benchmark file; 106 tests passed and 1 benchmark test skipped. A targeted test run first hit sandbox `spawn EPERM`; rerun with escalation passed.
+- `npm.cmd run build`: passed with escalation.
+- `npm.cmd run benchmark:tail` with the S8 CSV fixture passed with escalation after sandbox `spawn EPERM`: `UAT-TAIL-001`, balanced mode, 5 flights, 3 aircraft, 1 impacted flight, 7 ranked options, 15 ms runtime, tail rank #1, tail score 318, best non-tail score 428, score delta -111.
+- Recheck on 2026-05-02: S8 CSV `npm.cmd run benchmark:tail` again needed escalation after sandbox `spawn EPERM` and passed in 8 ms with tail rank #1, tail score 318, best non-tail score 428, score delta -111. HTTP smoke returned `/login` `200` and sessionless `/dashboard/simulate` `307` to login.
+- User reported on 2026-05-02 that manual browser testing passed; do not ask to repeat S8 manual UAT unless new evidence appears.
+- `npm.cmd run verify:prod`: passed with escalation on 2026-05-02 after sandbox Vitest `spawn EPERM`; it ran lint, tests, production build, and S8 benchmark. S8 benchmark result: 8 ms runtime, tail rank #1, tail score 318, best non-tail score 428, score delta -111.
+- Previous `npm.cmd run benchmark:tail`: passed with escalation after sandbox `spawn EPERM`; checked-in AIMS DayRep sample measured 329 ms runtime, 59,713 -> 3,945 arcs, 4,719 final paths, and no generated tail-optimized option for the sample AOG fixture. No-option diagnostics show candidate paths can cover 147/211 horizon flights, with station continuity mismatch as the top blocker.
 
 Known local caveats:
 
@@ -41,11 +55,31 @@ Known local caveats:
 11. Updated on 2026-04-30: audit pages now support UTC ISO timestamps, text filtering, and a saved-simulation drilldown route at `src/app/dashboard/audit/[uuid]/page.tsx`.
 12. Updated on 2026-04-30: compare now survives refresh for saved simulations via `/dashboard/compare?simulation=<uuid>&a=<id>&b=<id>`, while preserving the `sessionStorage` fallback for unsaved local compares.
 13. Updated on 2026-04-30: simulation results now explain blocked single-swap candidates and surface risk/penalty watchouts directly in the ranked options list on `src/app/dashboard/simulate/page.tsx`.
+14. Updated on 2026-05-01: tail-assignment optimization now applies a guarded connection-fixing pass that locks stable flight-to-flight links across top complete solutions, reruns path/master search, and reports initial/final optimizer metrics.
+15. Updated on 2026-05-01: tail-assignment optimizer diagnostics are now structured in `SimulationFeedback.tail_assignment`, shown on `/dashboard/simulate`, covered by AIMS UAT smoke assertions, and listed in the UAT report template.
+16. Updated on 2026-05-01: `npm.cmd run benchmark:tail` now runs an opt-in benchmark and prints tail optimizer runtime/rank/arc/path/search-node metrics for the checked-in AIMS DayRep fixture; `OCC_TAIL_BENCHMARK_AIMS` and `OCC_TAIL_BENCHMARK_DISRUPTION` can point it at real local files.
+17. Updated on 2026-05-01: tail-assignment feedback and `/dashboard/simulate` now explain no-option outcomes with a reason, candidate-covered versus required horizon flights, complete-solution count, and top blocker reasons.
+18. Updated on 2026-05-01: `public/uat/uat_tail_assignment_*` fixtures and `uat_scenario_tail_assignment.csv` now provide a small deterministic S8 UAT scenario where `TAIL_ASSIGNMENT_OPTIMIZED` ranks #1 and beats the best non-tail heuristic by 111 score points.
+19. Updated on 2026-05-01: tail assignment now supports `Fast`, `Balanced`, and `Deep` modes in the engine, Simulate UI, diagnostics, and `benchmark:tail` via `OCC_TAIL_BENCHMARK_MODE`.
+20. Updated on 2026-05-02: `/dashboard/simulate` now explains why each `TAIL_ASSIGNMENT_OPTIMIZED` option wins, loses, or ties against the best delay/swap heuristic, including score-breakdown drivers and tradeoffs.
+21. Updated on 2026-05-02: S8 UAT docs and the report template now ask testers to verify and record the tail ranking explanation.
+22. Updated on 2026-05-02: user reported manual browser UAT passed; next work should shift to production readiness rather than asking for another S8 manual run.
+23. Updated on 2026-05-02: added `docs/PROD_READINESS.md` and `docs/PROD_RELEASE_NOTES_TEMPLATE.md`, and linked the readiness checklist from Vercel deploy docs and README.
+24. Updated on 2026-05-02: updated `docs/uat/README.md` to reference 8 UAT scenarios and the S8 tail-assignment fixture files.
+25. Updated on 2026-05-02: added `npm.cmd run verify:prod`, backed by `scripts/run-prod-verify.cjs`, and verified it passes with escalation.
+26. Updated on 2026-05-02: hardened login/dashboard access for production. Production now fails closed when Supabase env vars are missing, the landing page routes auth-required users to `/login`, and stub dashboard access is only available outside production by default or via explicit `NEXT_PUBLIC_ALLOW_STUB_MODE=1`.
+27. Updated on 2026-05-02: added passenger impact MVP. The scorer now estimates affected pax, pax-delay minutes, misconnect risk, priority passenger score, and top passenger-impact flights; `/dashboard/simulate` surfaces the metrics in ranked rows and option detail.
+28. Updated on 2026-05-02: CSV and extended AIMS imports now populate optional passenger fields, Supabase persistence/load round-trips those fields via `0005_passenger_fields.sql`, and UAT/deploy docs now point migrations through 0005.
+29. Updated on 2026-05-02: added `docs/PROD_RELEASE_NOTES_DRAFT_2026-05-02.md` with local verification, S8 manual UAT acceptance, the latest passenger-scored S8 benchmark, and placeholders for real Vercel/Supabase release details.
+30. Updated on 2026-05-02: `/dashboard/data` now shows an import quality report with passenger coverage/fallback metrics and passenger preview columns; dataset validation warns on inconsistent passenger counts and load-factor mismatches.
+31. Updated on 2026-05-03: `DEEP_DELAY` now marks the selected low-priority flight even when propagation already imposes a larger delay, and the upgrade-verification test now checks that marker instead of assuming only one flight change.
+32. Updated on 2026-05-03: the unused `createPartialSwapHybrid` helper was removed and lint is clean for the production gate.
+33. Updated on 2026-05-03: `docs/PROD_READINESS.md` and `docs/PROD_RELEASE_NOTES_TEMPLATE.md` were aligned with the latest passenger-scored S8 benchmark and optimizer diagnostic fields.
 
 ## Recommended Next Step
 
 All four original review findings are addressed. Recommended next step:
 
-- Do an end-to-end UAT pass with real/sized AIMS exports.
-- Capture whether operators still need more explanation around curfew/risk scoring after trying the new simulation feedback.
-- Continue deeper large-data optimization only if real AIMS files still feel slow.
+- Run the target-environment parts of `docs/PROD_READINESS.md` for Supabase/Vercel.
+- Fill in the remaining `docs/PROD_RELEASE_NOTES_DRAFT_2026-05-02.md` placeholders after the target deployment, Supabase preflight, production smoke, owners, and backup timestamp are known.
+- Continue deeper large-data optimization only if real PROD-like AIMS exports still feel slow.

@@ -1,0 +1,118 @@
+
+> occ-disruption-recovery-web@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.92:3000
+- Environments: .env.local
+✓ Ready in 462ms
+Creating turbopack project {
+  dir: 'D:\\OCC-Disruption-Test\\occ-disruption-recovery-web',
+  testMode: true
+}
+
+ GET /login 200 in 318ms (next.js: 153ms, application-code: 165ms)
+ GET /dashboard 307 in 193ms (next.js: 53ms, application-code: 140ms)
+ GET /dashboard/data 307 in 80ms (next.js: 33ms, application-code: 47ms)
+ GET /dashboard/simulate 307 in 75ms (next.js: 26ms, application-code: 49ms)
+ GET / 200 in 234ms (next.js: 70ms, application-code: 164ms)
+ GET /dashboard 200 in 2.2s (next.js: 7ms, application-code: 2.2s)
+ GET /dashboard/schedule 200 in 71ms (next.js: 31ms, application-code: 40ms)
+ GET /dashboard/simulate 200 in 20ms (next.js: 4ms, application-code: 16ms)
+ GET /dashboard/data 200 in 23ms (next.js: 4ms, application-code: 19ms)
+ GET /dashboard/schedule 200 in 28ms (next.js: 7ms, application-code: 20ms)
+ GET /dashboard/simulate 200 in 23ms (next.js: 4ms, application-code: 19ms)
+ GET /login 200 in 200ms (next.js: 55ms, application-code: 145ms)
+ GET /dashboard/simulate 307 in 207ms (next.js: 5ms, application-code: 202ms)
+✓ Compiled in 998ms
+ GET /dashboard/simulate 200 in 2.5s (next.js: 11ms, application-code: 2.4s)
+ GET /dashboard/simulate 200 in 3.8s (next.js: 301ms, application-code: 3.5s)
+ GET /dashboard/simulate 200 in 2.7s (next.js: 13ms, application-code: 2.7s)
+ GET /dashboard/simulate 200 in 2.7s (next.js: 150ms, application-code: 2.5s)
+ GET /dashboard/simulate 200 in 2.7s (next.js: 94ms, application-code: 2.6s)
+ GET /dashboard/simulate 200 in 808ms (next.js: 70ms, application-code: 738ms)
+ GET /dashboard/simulate 200 in 1110ms (next.js: 20ms, application-code: 1090ms)
+ GET /dashboard/simulate 200 in 1036ms (next.js: 30ms, application-code: 1006ms)
+ GET /dashboard/simulate 200 in 1024ms (next.js: 106ms, application-code: 918ms)
+ GET /dashboard/simulate 200 in 1380ms (next.js: 76ms, application-code: 1305ms)
+ GET /dashboard/simulate 200 in 5.1s (next.js: 489ms, application-code: 4.6s)
+ GET /dashboard/simulate 200 in 1459ms (next.js: 5ms, application-code: 1453ms)
+ GET / 200 in 444ms (next.js: 186ms, application-code: 257ms)
+ GET /login 200 in 178ms (next.js: 109ms, application-code: 68ms)
+ GET /dashboard 200 in 2.4s (next.js: 192ms, application-code: 2.2s)
+ GET /dashboard/schedule 200 in 295ms (next.js: 208ms, application-code: 88ms)
+ GET /dashboard/simulate 200 in 25ms (next.js: 4ms, application-code: 21ms)
+ GET /dashboard/compare 200 in 112ms (next.js: 42ms, application-code: 71ms)
+ GET /dashboard/decoders 200 in 75ms (next.js: 31ms, application-code: 43ms)
+ GET /dashboard/audit 200 in 1686ms (next.js: 33ms, application-code: 1653ms)
+ GET /dashboard/data 200 in 393ms (next.js: 294ms, application-code: 99ms)
+ GET /dashboard/rules 200 in 73ms (next.js: 30ms, application-code: 43ms)
+ GET /dashboard/data 200 in 23ms (next.js: 4ms, application-code: 19ms)
+ GET /dashboard/rules 200 in 26ms (next.js: 3ms, application-code: 23ms)
+ GET /dashboard/data 200 in 24ms (next.js: 3ms, application-code: 21ms)
+ GET /dashboard/schedule 200 in 21ms (next.js: 3ms, application-code: 18ms)
+ GET /dashboard 200 in 26ms (next.js: 4ms, application-code: 22ms)
+ GET /dashboard/schedule 200 in 20ms (next.js: 3ms, application-code: 17ms)
+ GET /dashboard/simulate 200 in 20ms (next.js: 3ms, application-code: 17ms)
+✓ Compiled in 126ms
+ GET /dashboard/simulate 200 in 3.0s (next.js: 773ms, application-code: 2.3s)
+ GET /dashboard/simulate 200 in 3.3s (next.js: 244ms, application-code: 3.0s)
+✓ Compiled in 158ms
+ GET /dashboard/simulate 200 in 1348ms (next.js: 256ms, application-code: 1092ms)
+ GET /dashboard/simulate 200 in 811ms (next.js: 62ms, application-code: 749ms)
+ GET /dashboard/simulate 200 in 816ms (next.js: 11ms, application-code: 804ms)
+ GET /dashboard/simulate 200 in 952ms (next.js: 8ms, application-code: 944ms)
+ GET /dashboard/simulate 200 in 819ms (next.js: 180ms, application-code: 638ms)
+ GET /dashboard/simulate 200 in 823ms (next.js: 137ms, application-code: 686ms)
+✓ Compiled in 54ms
+ GET /dashboard/simulate 200 in 891ms (next.js: 286ms, application-code: 605ms)
+ GET /dashboard/simulate 200 in 368ms (next.js: 8ms, application-code: 360ms)
+ GET /dashboard/simulate 200 in 184ms (next.js: 10ms, application-code: 173ms)
+✓ Compiled in 165ms
+ GET /dashboard/simulate 200 in 481ms (next.js: 272ms, application-code: 209ms)
+✓ Compiled in 90ms
+ GET /dashboard/simulate 200 in 416ms (next.js: 228ms, application-code: 189ms)
+✓ Compiled in 121ms
+ GET /dashboard/simulate 200 in 382ms (next.js: 198ms, application-code: 184ms)
+✓ Compiled in 90ms
+ GET /dashboard/simulate 200 in 928ms (next.js: 256ms, application-code: 672ms)
+ GET /dashboard/simulate 200 in 2.7s (next.js: 9ms, application-code: 2.7s)
+✓ Compiled in 88ms
+ GET /dashboard/simulate 200 in 2.1s (next.js: 265ms, application-code: 1841ms)
+ GET /dashboard/simulate 200 in 1852ms (next.js: 9ms, application-code: 1843ms)
+✓ Compiled in 115ms
+ GET /dashboard/simulate 200 in 1874ms (next.js: 274ms, application-code: 1600ms)
+ GET /dashboard/simulate 200 in 1436ms (next.js: 11ms, application-code: 1425ms)
+✓ Compiled in 95ms
+ GET /dashboard/simulate 200 in 1165ms (next.js: 240ms, application-code: 925ms)
+ GET /dashboard/simulate 200 in 1114ms (next.js: 9ms, application-code: 1105ms)
+✓ Compiled in 380ms
+ GET /dashboard/simulate 200 in 1709ms (next.js: 15ms, application-code: 1693ms)
+ GET /dashboard/simulate 200 in 2.3s (next.js: 314ms, application-code: 2.0s)
+ GET /dashboard/simulate 200 in 1712ms (next.js: 226ms, application-code: 1486ms)
+ GET /dashboard/simulate 200 in 1842ms (next.js: 12ms, application-code: 1831ms)
+ GET /dashboard/simulate 200 in 1722ms (next.js: 80ms, application-code: 1642ms)
+ GET /dashboard/simulate 200 in 1723ms (next.js: 169ms, application-code: 1555ms)
+ GET /dashboard/simulate 200 in 306ms (next.js: 10ms, application-code: 295ms)
+ GET /dashboard/simulate 200 in 307ms (next.js: 59ms, application-code: 248ms)
+ GET /dashboard/simulate 200 in 1216ms (next.js: 255ms, application-code: 961ms)
+ GET /dashboard/simulate 200 in 777ms (next.js: 9ms, application-code: 768ms)
+ GET /dashboard/simulate 200 in 759ms (next.js: 12ms, application-code: 747ms)
+ GET /dashboard/simulate 200 in 759ms (next.js: 124ms, application-code: 635ms)
+ GET /dashboard/simulate 200 in 881ms (next.js: 421ms, application-code: 459ms)
+ GET /dashboard/simulate 200 in 1053ms (next.js: 69ms, application-code: 984ms)
+ GET /dashboard/simulate 200 in 465ms (next.js: 13ms, application-code: 452ms)
+ GET /dashboard/simulate 200 in 324ms (next.js: 13ms, application-code: 310ms)
+ GET /dashboard/simulate 200 in 208ms (next.js: 12ms, application-code: 196ms)
+✓ Compiled in 92ms
+ GET /dashboard/simulate 200 in 2.3s (next.js: 264ms, application-code: 1989ms)
+ GET /dashboard/simulate 200 in 2.3s (next.js: 7ms, application-code: 2.3s)
+ GET /dashboard/simulate 200 in 1814ms (next.js: 212ms, application-code: 1602ms)
+ GET /dashboard/simulate 200 in 1578ms (next.js: 9ms, application-code: 1569ms)
+ GET /dashboard/simulate 200 in 437ms (next.js: 210ms, application-code: 227ms)
+ GET / 200 in 224ms (next.js: 32ms, application-code: 191ms)
+ GET /login 200 in 40ms (next.js: 19ms, application-code: 22ms)
+ GET /dashboard 200 in 2.0s (next.js: 202ms, application-code: 1800ms)
+ GET /dashboard/schedule 200 in 307ms (next.js: 199ms, application-code: 108ms)
+ GET /dashboard/simulate 200 in 56ms (next.js: 8ms, application-code: 48ms)

@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { hasSupabaseEnv, isAuthRequired, isStubModeAllowed } from "./auth-mode";
 
 export function createSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -9,8 +10,13 @@ export function createSupabaseBrowserClient() {
 }
 
 export function isSupabaseConfiguredBrowser(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
+  return hasSupabaseEnv();
+}
+
+export function isStubModeAllowedBrowser(): boolean {
+  return isStubModeAllowed();
+}
+
+export function isAuthRequiredBrowser(): boolean {
+  return isAuthRequired();
 }

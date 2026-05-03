@@ -38,19 +38,19 @@ Next.js + Supabase + Vercel re-platform of the OCC Disruption Recovery MVP. Desi
 # 1. Install deps
 npm install
 
-# 2. Configure env (optional — app runs in stub mode without Supabase)
+# 2. Configure env (optional for local dev — production requires Supabase)
 # create .env.local with NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # 3. Dev server
 npm run dev
 ```
 
-Open http://localhost:3000. The dashboard auto-loads sample AOG data so the demo works immediately even without Supabase.
+Open http://localhost:3000. In local development, the dashboard can run in stub mode without Supabase and auto-loads sample AOG data. Production deployments fail closed and require Supabase auth.
 
 ## Supabase setup (when ready)
 
 1. Create a free project at https://supabase.com (region: Singapore for VN users).
-2. Run the SQL files in `supabase/migrations/` in order through `0003_approval_safety.sql` (paste each one into the SQL Editor, or apply them with Supabase CLI).
+2. Run the SQL files in `supabase/migrations/` in order through `0007_actual_times.sql` (paste each one into the SQL Editor, or apply them with Supabase CLI).
 3. Settings → API → copy `Project URL` and `anon public key` into `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 4. (Optional) Add team users via Supabase Auth dashboard. Default role is `viewer`. Update profile rows to `controller` / `admin` for write access.
 
@@ -59,7 +59,8 @@ Open http://localhost:3000. The dashboard auto-loads sample AOG data so the demo
 1. Push to GitHub.
 2. https://vercel.com/new → Import the repo.
 3. Add env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Deploy.
+4. Complete `docs/PROD_READINESS.md`.
+5. Deploy.
 
 ## Roadmap
 

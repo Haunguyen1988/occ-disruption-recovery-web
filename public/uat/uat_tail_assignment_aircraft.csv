@@ -1,0 +1,4 @@
+aircraft_id,aircraft_type,current_station,available_from,status,next_maintenance_time,restriction
+TAIL-A,A321,SGN,2026-04-27T23:00:00Z,ACTIVE,2026-04-29T00:00:00Z,
+TAIL-B,A321,SGN,2026-04-27T23:00:00Z,ACTIVE,2026-04-29T00:00:00Z,
+TAIL-C,A321,DAD,2026-04-27T23:00:00Z,ACTIVE,2026-04-29T00:00:00Z,

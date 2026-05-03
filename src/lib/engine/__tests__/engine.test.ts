@@ -107,6 +107,43 @@ describe("impact detector (K1 fix)", () => {
     // Only VJ101-D1 is truly impacted
     expect(ids).toEqual(["VJ101-D1"]);
   });
+
+  it("does not flag a flight that already has ATA", () => {
+    const completedSchedule: FlightLeg[] = [
+      {
+        ...SCHEDULE[0],
+        actual_arrival_time: new Date("2026-04-28T03:05:00Z"),
+      },
+    ];
+
+    const impacted = findImpactedFlights(AOG, completedSchedule, RULES);
+
+    expect(impacted).toEqual([]);
+  });
+
+  it("does not flag a flight that already has ATD", () => {
+    const departedSchedule: FlightLeg[] = [
+      {
+        ...SCHEDULE[0],
+        actual_departure_time: new Date("2026-04-28T01:02:00Z"),
+      },
+    ];
+
+    const impacted = findImpactedFlights(AOG, departedSchedule, RULES);
+
+    expect(impacted).toEqual([]);
+  });
+
+  it("does not flag AOG flights unrelated to the selected airport", () => {
+    const aogAtDad: DisruptionEvent = {
+      ...AOG,
+      affected_airport: "DAD",
+    };
+
+    const impacted = findImpactedFlights(aogAtDad, SCHEDULE, RULES);
+
+    expect(impacted).toEqual([]);
+  });
 });
 
 describe("simulation pipeline", () => {
@@ -187,15 +224,7 @@ describe("simulation pipeline", () => {
     const swapOptions = result.ranked_options.filter(
       (o) => o.option_type === "SINGLE_SWAP",
     );
-    // A2 upgrade: partial swap hybrids may still be generated even when the
-    // candidate cannot cover the entire downstream rotation.  Full-rotation
-    // swaps must still be blocked, so we check that no *full* swap option
-    // exists for VJ-A324.
-    const fullSwaps = swapOptions.filter(
-      (o) =>
-        !o.reason_codes.some((r) => r.includes("Partial swap")),
-    );
-    expect(fullSwaps).toHaveLength(0);
+    expect(swapOptions).toHaveLength(0);
   });
 
   it("does not generate SINGLE_SWAP when candidate would break station continuity", () => {
@@ -264,6 +293,190 @@ describe("simulation pipeline", () => {
           candidate.aircraft_id === "VJ-A324" &&
           (candidate.blocking_reason?.includes("overlapping proposed") ||
            candidate.blocking_reason === null), // feasible via chain swap
+      ),
+    ).toBe(true);
+  });
+
+  it("recovers the downstream rotation of the displaced swap aircraft", () => {
+    const schedule: FlightLeg[] = [
+      {
+        flight_id: "A1-1",
+        flight_number: "A101",
+        origin: "SGN",
+        destination: "HAN",
+        std: new Date("2026-04-28T01:00:00Z"),
+        sta: new Date("2026-04-28T03:00:00Z"),
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+      {
+        flight_id: "A1-2",
+        flight_number: "A102",
+        origin: "HAN",
+        destination: "SGN",
+        std: new Date("2026-04-28T04:00:00Z"),
+        sta: new Date("2026-04-28T06:00:00Z"),
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+      {
+        flight_id: "A2-1",
+        flight_number: "B201",
+        origin: "SGN",
+        destination: "DAD",
+        std: new Date("2026-04-28T01:30:00Z"),
+        sta: new Date("2026-04-28T02:30:00Z"),
+        aircraft_id: "A2",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.7,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+      {
+        flight_id: "A2-2",
+        flight_number: "B202",
+        origin: "DAD",
+        destination: "SGN",
+        std: new Date("2026-04-28T07:00:00Z"),
+        sta: new Date("2026-04-28T08:00:00Z"),
+        aircraft_id: "A2",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.7,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+    ];
+    const aircraft: Aircraft[] = [
+      {
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-04-28T00:00:00Z"),
+        status: "AOG",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+      {
+        aircraft_id: "A2",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-04-28T00:00:00Z"),
+        status: "ACTIVE",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+      {
+        aircraft_id: "A3",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-04-28T00:00:00Z"),
+        status: "ACTIVE",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+    ];
+    const disruption: DisruptionEvent = {
+      ...AOG,
+      affected_aircraft: "A1",
+      start_time: new Date("2026-04-28T01:15:00Z"),
+      end_time: new Date("2026-04-28T03:15:00Z"),
+    };
+
+    const result = runSimulation({ schedule, aircraft, disruption, rules: RULES });
+    const chain = result.ranked_options.find(
+      (option) => option.option_type === "SWAP_CHAIN",
+    );
+
+    expect(chain).toBeTruthy();
+    expect(chain!.flight_changes.map((change) => change.flight_id)).toEqual(
+      expect.arrayContaining(["A1-1", "A1-2", "A2-1", "A2-2"]),
+    );
+    expect(
+      chain!.flight_changes.find((change) => change.flight_id === "A2-2")
+        ?.new_aircraft,
+    ).toBe("A3");
+  });
+
+  it("does not swap a downstream cluster when CAPT/FO changes inside the cluster", () => {
+    const schedule: FlightLeg[] = [
+      {
+        flight_id: "CREW-1",
+        flight_number: "C101",
+        origin: "SGN",
+        destination: "HAN",
+        std: new Date("2026-04-28T01:00:00Z"),
+        sta: new Date("2026-04-28T03:00:00Z"),
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+        captain: "CAPT A",
+        first_officer: "FO A",
+      },
+      {
+        flight_id: "CREW-2",
+        flight_number: "C102",
+        origin: "HAN",
+        destination: "SGN",
+        std: new Date("2026-04-28T04:00:00Z"),
+        sta: new Date("2026-04-28T06:00:00Z"),
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+        captain: "CAPT B",
+        first_officer: "FO B",
+      },
+    ];
+    const aircraft: Aircraft[] = [
+      {
+        aircraft_id: "A1",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-04-28T00:00:00Z"),
+        status: "AOG",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+      {
+        aircraft_id: "A2",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-04-28T00:00:00Z"),
+        status: "ACTIVE",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+    ];
+    const disruption: DisruptionEvent = {
+      ...AOG,
+      affected_aircraft: "A1",
+      start_time: new Date("2026-04-28T01:00:00Z"),
+      end_time: new Date("2026-04-28T02:00:00Z"),
+    };
+
+    const result = runSimulation({ schedule, aircraft, disruption, rules: RULES });
+
+    expect(
+      result.ranked_options.some((option) => option.option_type === "SINGLE_SWAP"),
+    ).toBe(false);
+    expect(
+      result.feedback?.candidates.some((candidate) =>
+        candidate.blocking_reason?.includes("Crew continuity mismatch"),
       ),
     ).toBe(true);
   });
@@ -507,6 +720,165 @@ describe("multi-event simulation (K10)", () => {
     const reasons = vj102!.reason_codes.join(" | ");
     expect(reasons).toContain("HAN");
     expect(result.ranked_options[0].rank).toBe(1);
+    const deepDelay = result.ranked_options.find(
+      (option) => option.option_type === "DEEP_DELAY",
+    );
+    expect(deepDelay?.flight_changes.length).toBeGreaterThanOrEqual(
+      result.impacted_flights.length,
+    );
+  });
+
+  it("uses each event window when delaying multi-event impacted flights", () => {
+    const schedule: FlightLeg[] = [
+      {
+        flight_id: "WX-1",
+        flight_number: "WX101",
+        origin: "SGN",
+        destination: "DAD",
+        std: new Date("2026-05-02T16:30:00Z"),
+        sta: new Date("2026-05-02T17:30:00Z"),
+        aircraft_id: "WX-A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+      {
+        flight_id: "AOG-1",
+        flight_number: "MX901",
+        origin: "SGN",
+        destination: "HAN",
+        std: new Date("2026-05-02T18:00:00Z"),
+        sta: new Date("2026-05-02T20:00:00Z"),
+        aircraft_id: "MX-A1",
+        aircraft_type: "A321",
+        priority_level: 2,
+        load_factor: 0.8,
+        is_international: false,
+        is_last_flight_of_day: false,
+      },
+    ];
+    const aircraft: Aircraft[] = [
+      {
+        aircraft_id: "WX-A1",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-05-02T00:00:00Z"),
+        status: "ACTIVE",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+      {
+        aircraft_id: "MX-A1",
+        aircraft_type: "A321",
+        current_station: "SGN",
+        available_from: new Date("2026-05-02T00:00:00Z"),
+        status: "AOG",
+        next_maintenance_time: null,
+        restriction: null,
+      },
+    ];
+    const weather: DisruptionEvent = {
+      event_id: "EVT-WX",
+      event_type: "WEATHER",
+      start_time: new Date("2026-05-02T16:00:00Z"),
+      end_time: new Date("2026-05-02T17:00:00Z"),
+      severity: "MEDIUM",
+      description: "SGN weather stop",
+      affected_aircraft: null,
+      affected_airport: "SGN",
+      affected_flight_id: null,
+    };
+    const aog: DisruptionEvent = {
+      event_id: "EVT-AOG-LATE",
+      event_type: "AOG",
+      start_time: new Date("2026-05-02T17:00:00Z"),
+      end_time: new Date("2026-05-02T23:50:00Z"),
+      severity: "HIGH",
+      description: "Late AOG",
+      affected_aircraft: "MX-A1",
+      affected_airport: "SGN",
+      affected_flight_id: null,
+    };
+
+    const result = runMultiEventSimulation({
+      schedule,
+      aircraft,
+      disruptions: [aog, weather],
+      rules: RULES,
+    });
+    const delayOnly = result.ranked_options.find(
+      (option) => option.option_type === "DELAY_ONLY",
+    );
+    const weatherChange = delayOnly?.flight_changes.find(
+      (change) => change.flight_id === "WX-1",
+    );
+
+    expect(weatherChange).toBeTruthy();
+    expect(weatherChange!.new_std.getTime()).toBeLessThan(
+      aog.end_time.getTime(),
+    );
+    expect(weatherChange!.delay_minutes).toBeLessThan(180);
+  });
+
+  it("expands multi-event AOG impacts to the downstream rotation", () => {
+    const closePqc: DisruptionEvent = {
+      event_id: "EVT-CLOSE-PQC",
+      event_type: "AIRPORT_CLOSE",
+      start_time: new Date("2026-04-28T12:00:00Z"),
+      end_time: new Date("2026-04-28T13:00:00Z"),
+      severity: "HIGH",
+      description: "PQC weather stop",
+      affected_aircraft: null,
+      affected_airport: "PQC",
+      affected_flight_id: null,
+    };
+
+    const result = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [AOG, closePqc],
+      rules: RULES,
+    });
+
+    expect(result.impacted_flights.map((i) => i.flight.flight_id)).toEqual([
+      "VJ101-D1",
+      "VJ102-D1",
+      "VJ103-D1",
+    ]);
+    expect(
+      result.impacted_flights
+        .find((i) => i.flight.flight_id === "VJ102-D1")
+        ?.reason_codes.some((r) => r.includes("Downstream rotation affected")),
+    ).toBe(true);
+  });
+
+  it("does not emit duplicate or uncovered flight changes in ranked options", () => {
+    const closeHan: DisruptionEvent = {
+      event_id: "EVT-CLOSE-HAN",
+      event_type: "AIRPORT_CLOSE",
+      start_time: new Date("2026-04-28T03:30:00Z"),
+      end_time: new Date("2026-04-28T05:30:00Z"),
+      severity: "HIGH",
+      description: "HAN runway closure",
+      affected_aircraft: null,
+      affected_airport: "HAN",
+      affected_flight_id: null,
+    };
+    const result = runMultiEventSimulation({
+      schedule: SCHEDULE,
+      aircraft: AIRCRAFT,
+      disruptions: [AOG, closeHan],
+      rules: RULES,
+    });
+
+    for (const option of result.ranked_options) {
+      const ids = option.flight_changes.map((fc) => fc.flight_id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(option.flight_changes.some((fc) => fc.new_aircraft === "UNCOVERED"))
+        .toBe(false);
+    }
   });
 
   it("excludes AOG'd aircraft from the swap candidate pool", () => {

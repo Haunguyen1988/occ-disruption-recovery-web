@@ -1,5 +1,6 @@
 import type { FlightLeg, OccRules, RecoveryOption } from "@/lib/types";
 import { isInCurfew } from "./time-utils";
+import { calculatePassengerImpact } from "./passenger-impact";
 
 /**
  * Count curfew violations across all flight changes in the option.
@@ -121,6 +122,9 @@ export function calculateRecoveryScore(
   const impactedWeight = w.impacted_flight_weight ?? 10;
   const swapPenalty = w.swap_penalty ?? 25;
   const curfewWeight = w.curfew_risk_penalty ?? 120;
+  const passengerDelayWeight = w.passenger_delay_weight ?? 0.02;
+  const passengerPriorityWeight = w.passenger_priority_weight ?? 15;
+  const misconnectRiskPenalty = w.misconnect_risk_penalty ?? 80;
 
   const curfewViolations = countCurfewViolations(option, rules);
   option.curfew_violations = curfewViolations;
@@ -149,13 +153,29 @@ export function calculateRecoveryScore(
 
   // Phase 3: downstream ripple estimate
   const rippleEstimate = estimateDownstreamRipple(option, schedule);
+  const passengerImpact = calculatePassengerImpact(option, rules, schedule);
+  const passengerDelayComponent =
+    (passengerImpact?.passenger_delay_minutes ?? 0) * passengerDelayWeight;
+  const passengerPriorityComponent =
+    (passengerImpact?.priority_passenger_score ?? 0) * passengerPriorityWeight;
+  const misconnectRiskComponent =
+    (passengerImpact?.misconnect_risk_passengers ?? 0) * misconnectRiskPenalty;
 
   if (option.option_type === "SPREAD_DELAY") baseScore *= 0.95;
 
   option.score =
     Math.round(
-      (baseScore + riskPenalty + priorityPenalty + rippleEstimate) * 100,
+      (
+        baseScore +
+        riskPenalty +
+        priorityPenalty +
+        rippleEstimate +
+        passengerDelayComponent +
+        passengerPriorityComponent +
+        misconnectRiskComponent
+      ) * 100,
     ) / 100;
+  option.passenger_impact = passengerImpact ?? undefined;
   option.score_breakdown = {
     total_delay_component: option.total_delay_minutes * totalDelayWeight,
     max_delay_component: option.max_delay_minutes * maxDelayWeight,
@@ -165,7 +185,14 @@ export function calculateRecoveryScore(
     risk_penalty: riskPenalty,
     priority_protection_penalty: priorityPenalty,
     downstream_ripple_estimate: rippleEstimate,
+    passenger_delay_component: passengerDelayComponent,
+    passenger_priority_component: passengerPriorityComponent,
+    misconnect_risk_component: misconnectRiskComponent,
   };
+  if (passengerImpact?.high_impact) {
+    const reason = `High passenger impact: approximately ${passengerImpact.estimated_affected_passengers} passengers affected`;
+    if (!option.reason_codes.includes(reason)) option.reason_codes.push(reason);
+  }
   return option;
 }
 

@@ -1,0 +1,6 @@
+flight_id,flight_number,origin,destination,std,sta,aircraft_id,aircraft_type,priority_level,load_factor,is_international,is_last_flight_of_day
+TAIL-F1,VJ101,SGN,HAN,2026-04-28T10:00:00Z,2026-04-28T12:00:00Z,TAIL-A,A321,1,0.90,false,false
+TAIL-F2,VJ102,HAN,SGN,2026-04-28T12:50:00Z,2026-04-28T14:50:00Z,TAIL-A,A321,1,0.88,false,true
+TAIL-G1,VJ201,SGN,DAD,2026-04-28T12:00:00Z,2026-04-28T13:00:00Z,TAIL-B,A321,3,0.55,false,false
+TAIL-G2,VJ202,DAD,SGN,2026-04-28T13:45:00Z,2026-04-28T14:45:00Z,TAIL-B,A321,3,0.50,false,true
+TAIL-X1,VJ900,DAD,PQC,2026-04-28T12:10:00Z,2026-04-28T13:10:00Z,TAIL-C,A321,3,0.40,false,true

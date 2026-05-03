@@ -48,6 +48,57 @@ describe("AIMS DayRep parser", () => {
     expect(r.detectedFormat).toBe("aims_dayrep");
   });
 
+  it("parses optional passenger columns from extended DayRep exports", () => {
+    const matrix = [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [
+        "DATE",
+        "FLT",
+        "REG",
+        "",
+        "AC",
+        "DEP",
+        "ARR",
+        "STD",
+        "STA",
+        "SEATS",
+        "PAX",
+        "CONN PAX",
+        "VIP",
+        "SSR",
+      ],
+      [
+        "28/04/26",
+        "100",
+        "VN-A321",
+        "",
+        "321",
+        "SGN",
+        "HAN",
+        "07:00",
+        "09:10",
+        "230",
+        "209",
+        "24",
+        "2",
+        "3",
+      ],
+    ];
+    const r = parseAimsDayRep(matrix);
+    expect(r.issues).toHaveLength(0);
+    expect(r.schedule[0]).toMatchObject({
+      seat_capacity: 230,
+      booked_passengers: 209,
+      connecting_passengers: 24,
+      vip_passengers: 2,
+      special_service_passengers: 3,
+    });
+  });
+
   it("derives 73 unique aircraft from REG column", () => {
     const r = parseAimsDayRep(loadFixtureMatrix());
     expect(r.aircraft).toHaveLength(73);

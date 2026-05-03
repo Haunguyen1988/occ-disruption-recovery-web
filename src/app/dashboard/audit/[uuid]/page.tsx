@@ -178,8 +178,8 @@ export default async function SimulationDetailPage({
                   value={`${option.total_delay_minutes} / ${option.max_delay_minutes}`}
                 />
                 <Metric
-                  label="Impact / swaps"
-                  value={`${option.impacted_flight_count} / ${option.swap_count}`}
+                  label="Coverage / swaps"
+                  value={`${option.impacted_flight_count} flights · ${option.swap_count} swap`}
                 />
               </div>
             </div>

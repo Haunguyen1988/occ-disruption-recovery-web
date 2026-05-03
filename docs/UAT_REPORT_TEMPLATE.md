@@ -26,6 +26,7 @@
 | S5 | Viewer least-privilege | viewer | PASS / FAIL | 0 | 0 | 0 | |
 | S6 | CSV upload error handling | controller | PASS / FAIL | 0 | 0 | 0 | |
 | S7 | Timezone-aware display | controller | PASS / FAIL | 0 | 0 | 0 | |
+| S8 | Tail-assignment optimized recovery | controller | PASS / FAIL | 0 | 0 | 0 | |
 
 A scenario is **PASS** only when every Sev1 step passed.
 
@@ -43,8 +44,18 @@ A scenario is **PASS** only when every Sev1 step passed.
 ## Operational metrics observed
 
 > Eyeballed during the round, not formal benchmarks. Useful for trend over time.
+> Local benchmark helper: run `npm.cmd run benchmark:tail` and paste the table below when using the checked-in AIMS DayRep sample.
+> For real exports, set `OCC_TAIL_BENCHMARK_AIMS` and `OCC_TAIL_BENCHMARK_DISRUPTION` to local file paths before running the helper. For CSV fixtures, set `OCC_TAIL_BENCHMARK_SCHEDULE`, `OCC_TAIL_BENCHMARK_AIRCRAFT`, and `OCC_TAIL_BENCHMARK_DISRUPTION`. Set `OCC_TAIL_BENCHMARK_MODE=fast|balanced|deep` to benchmark a specific optimizer mode.
 
 - Time-to-first-ranked-option after **Run simulation**: `_s` (target ≤ 5s on 325-flight schedule)
+- Tail optimizer horizon shown on Simulate page: `_ flights / _ aircraft`
+- Tail optimizer mode: `fast / balanced / deep`
+- Tail optimizer arc reduction: `_ -> _ arcs (_% removed)`
+- Tail optimizer paths / master-search nodes: `_ paths / _ nodes`
+- Tail optimizer connection fixing: `_ locked` or `not applied`
+- Tail optimized option generated / rank: `yes/no`, rank `_`
+- Tail score delta vs best non-tail heuristic: `_`
+- Tail ranking explanation observed: `wins / loses / ties / missing`; key driver text: `_`
 - Time-to-save-to-Supabase from **Save to Supabase** click: `_s` (target ≤ 10s)
 - Number of audit rows produced per scenario: `_` (target ≥ steps that mutated data)
 - Errors observed in browser console outside expected flows: `_` (target 0)

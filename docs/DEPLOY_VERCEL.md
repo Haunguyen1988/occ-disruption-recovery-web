@@ -32,7 +32,8 @@ Project → **Settings → Domains** → add e.g. `occ.vietjet.internal` (you'll
 
 ## 5. Production checklist before sharing the URL with users
 
-- [ ] Run `supabase/migrations/0001_init.sql`, `0002_curfew_and_multi_event.sql`, and `0003_approval_safety.sql` against the Supabase project in order.
+- [ ] Complete `docs/PROD_READINESS.md` for release gate, Supabase preflight, smoke test, observability, and rollback checks.
+- [ ] Run migrations in `supabase/migrations/` against the Supabase project in order through `0007_actual_times.sql`.
 - [ ] Create the user accounts in Supabase Dashboard → **Authentication → Users**.
 - [ ] Set roles: in the SQL editor —
   ```sql
@@ -50,7 +51,7 @@ Every pull request gets a unique preview URL automatically. The CI workflow at `
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Build fails: "Module not found" | Vercel Node version mismatch | Settings → Node.js Version → 22 |
-| Preview shows "Stub mode" sidebar | Env vars not set for **Preview** environment | Re-add them with all 3 environments ticked |
+| Preview login says auth is not configured | Env vars not set for **Preview** environment | Re-add them with all 3 environments ticked |
 | Sign-in error "Invalid API key" | Wrong key (service-role vs anon) | Use the **anon** key |
 | Login succeeds but Save buttons hidden | Default role is `viewer` | Run the role-update SQL above |
 | 5xx on `/dashboard` | Supabase URL typo | Double-check `https://<id>.supabase.co` |

@@ -34,6 +34,31 @@ const AIMS_HEADER_SIGNATURE = [
 ];
 const HEADER_ROW_INDEX = 5;
 
+const OPTIONAL_PASSENGER_COLUMN_ALIASES = {
+  seat_capacity: ["SEAT_CAPACITY", "SEAT CAPACITY", "CAPACITY", "SEATS"],
+  booked_passengers: ["BOOKED_PASSENGERS", "BOOKED PASSENGERS", "BOOKED", "PAX"],
+  connecting_passengers: [
+    "CONNECTING_PASSENGERS",
+    "CONNECTING PASSENGERS",
+    "CONNECTING",
+    "CONN_PAX",
+    "CONN PAX",
+  ],
+  vip_passengers: ["VIP_PASSENGERS", "VIP PASSENGERS", "VIP"],
+  special_service_passengers: [
+    "SPECIAL_SERVICE_PASSENGERS",
+    "SPECIAL SERVICE PASSENGERS",
+    "SSR_PASSENGERS",
+    "SSR PASSENGERS",
+    "SSR",
+  ],
+} as const;
+
+const OPTIONAL_CREW_COLUMN_ALIASES = {
+  captain: ["CAPTAIN", "CAPT", "CPT", "PIC"],
+  first_officer: ["FIRST_OFFICER", "FIRST OFFICER", "FO", "F/O", "SIC"],
+} as const;
+
 export interface AimsParseResult {
   schedule: FlightLeg[];
   aircraft: Aircraft[];
@@ -109,6 +134,133 @@ function aircraftTypeFromCode(code: string): string {
   return t;
 }
 
+function normalizeHeader(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+}
+
+function passengerColumnIndex(
+  header: unknown[],
+  field: keyof typeof OPTIONAL_PASSENGER_COLUMN_ALIASES,
+): number {
+  const aliases: ReadonlySet<string> = new Set(
+    OPTIONAL_PASSENGER_COLUMN_ALIASES[field],
+  );
+  return header.findIndex((cell) => aliases.has(normalizeHeader(cell)));
+}
+
+function optionalColumnIndex(
+  header: unknown[],
+  aliases: readonly string[],
+): number {
+  const normalizedAliases: ReadonlySet<string> = new Set(aliases);
+  return header.findIndex((cell) => normalizedAliases.has(normalizeHeader(cell)));
+}
+
+function parseOptionalAimsInteger(
+  raw: unknown,
+  rowNum: number,
+  column: string,
+  issues: ValidationIssue[],
+): number | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    issues.push({
+      level: "warning",
+      message: `${column} is not a non-negative integer — ignoring value`,
+      row: rowNum,
+      column,
+      value: String(raw),
+      source: "schedule",
+    });
+    return undefined;
+  }
+  return n;
+}
+
+function parseOptionalPassengerFields(
+  raw: unknown[],
+  header: unknown[],
+  rowNum: number,
+  issues: ValidationIssue[],
+): Partial<
+  Pick<
+    FlightLeg,
+    | "seat_capacity"
+    | "booked_passengers"
+    | "connecting_passengers"
+    | "vip_passengers"
+    | "special_service_passengers"
+  >
+> {
+  const parsed: Partial<
+    Pick<
+      FlightLeg,
+      | "seat_capacity"
+      | "booked_passengers"
+      | "connecting_passengers"
+      | "vip_passengers"
+      | "special_service_passengers"
+    >
+  > = {};
+
+  for (const field of Object.keys(OPTIONAL_PASSENGER_COLUMN_ALIASES) as Array<
+    keyof typeof OPTIONAL_PASSENGER_COLUMN_ALIASES
+  >) {
+    const idx = passengerColumnIndex(header, field);
+    if (idx === -1) continue;
+    const value = parseOptionalAimsInteger(
+      raw[idx],
+      rowNum,
+      String(header[idx]),
+      issues,
+    );
+    if (value !== undefined) parsed[field] = value;
+  }
+
+  return parsed;
+}
+
+function parseOptionalCrewFields(
+  raw: unknown[],
+  header: unknown[],
+): Partial<Pick<FlightLeg, "captain" | "first_officer">> {
+  const parsed: Partial<Pick<FlightLeg, "captain" | "first_officer">> = {};
+  for (const field of Object.keys(OPTIONAL_CREW_COLUMN_ALIASES) as Array<
+    keyof typeof OPTIONAL_CREW_COLUMN_ALIASES
+  >) {
+    const idx = optionalColumnIndex(header, OPTIONAL_CREW_COLUMN_ALIASES[field]);
+    if (idx === -1) continue;
+    const value = String(raw[idx] ?? "").trim();
+    if (value) parsed[field] = value;
+  }
+  return parsed;
+}
+
+function parseOptionalAimsActualTime(
+  raw: unknown[],
+  columnIndex: number,
+  scheduled: Date,
+  year: number,
+  month: number,
+  day: number,
+  airportTz: string,
+): Date | undefined {
+  const value = String(raw[columnIndex] ?? "").trim();
+  if (!value) return undefined;
+  const parsed = parseHHMM(value);
+  if (!parsed) return undefined;
+  const sameDay = localToUtc(year, month, day, parsed.h, parsed.m, airportTz);
+  if (sameDay.getTime() + 12 * 60 * 60 * 1000 < scheduled.getTime()) {
+    const next = addDays(year, month, day, 1);
+    return localToUtc(next.year, next.month, next.day, parsed.h, parsed.m, airportTz);
+  }
+  return sameDay;
+}
+
 function isInternationalRoute(origin: string, destination: string): boolean {
   // Heuristic: VN domestic IATA codes start with V/H/D/S/B/U/T (HAN, SGN, DAD,
   // VCA, VCS, etc). Non-VN airports in this report (NRT, ICN, HKG, KWL, RMQ,
@@ -129,6 +281,7 @@ interface RowOut {
 
 function buildRow(
   raw: unknown[],
+  header: unknown[],
   rowNum: number,
   issues: ValidationIssue[],
 ): RowOut | null {
@@ -201,6 +354,26 @@ function buildRow(
       : localToUtc(d.year, d.month, d.day, staT.h, staT.m, destTz);
 
   const acType = aircraftTypeFromCode(ac);
+  const passengerFields = parseOptionalPassengerFields(raw, header, rowNum, issues);
+  const crewFields = parseOptionalCrewFields(raw, header);
+  const actualDepartureTime = parseOptionalAimsActualTime(
+    raw,
+    13,
+    stdDate,
+    d.year,
+    d.month,
+    d.day,
+    originTz,
+  );
+  const actualArrivalTime = parseOptionalAimsActualTime(
+    raw,
+    14,
+    staDate,
+    d.year,
+    d.month,
+    d.day,
+    destTz,
+  );
   // Include origin so round-trip pairings that reuse the same flight number
   // on the same aircraft on the same day (e.g. flight 5068 HAN→CXR + 5068
   // CXR→HAN) get distinct flight_ids. Pure ${date}-${flt}-${reg} collides.
@@ -222,6 +395,10 @@ function buildRow(
       load_factor: 0,
       is_international: isInternationalRoute(dep, arr),
       is_last_flight_of_day: false,
+      ...passengerFields,
+      ...crewFields,
+      actual_departure_time: actualDepartureTime,
+      actual_arrival_time: actualArrivalTime,
     },
   };
 }
@@ -238,10 +415,11 @@ export function parseAimsDayRep(matrix: unknown[][]): AimsParseResult {
   if (!looksLikeAimsDayRep(matrix)) {
     return { schedule: [], aircraft: [], issues, detectedFormat: null };
   }
+  const header = matrix[HEADER_ROW_INDEX] ?? [];
   for (let i = HEADER_ROW_INDEX + 1; i < matrix.length; i++) {
     const row = matrix[i];
     if (!Array.isArray(row)) continue;
-    const out = buildRow(row, i + 1, issues);
+    const out = buildRow(row, header, i + 1, issues);
     if (out) schedule.push(out.flight);
   }
 

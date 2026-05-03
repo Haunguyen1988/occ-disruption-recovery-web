@@ -2,7 +2,7 @@
 -- UAT cleanup — wipes UAT-generated rows so production demo starts clean.
 -- =============================================================================
 --
--- Schema notes (as of 0003):
+-- Schema notes (as of 0007):
 --   * `simulations.created_by`        → uuid (auth.users.id)
 --   * `disruption_events.created_by`  → uuid (auth.users.id)
 --   * `audit_log.actor`               → uuid (auth.users.id)

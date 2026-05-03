@@ -10,7 +10,9 @@ import type {
 import { findImpactedFlights } from "./impact-detector";
 import { rankRecoveryOptions } from "./option-scorer";
 import { generateRecoveryOptions } from "./recovery-option-generator";
-import { buildScheduleIndex } from "./schedule-index";
+import { buildScheduleIndex, getAircraftRotation } from "./schedule-index";
+import { isOperatedFlight } from "./flight-status";
+import type { TailAssignmentMode } from "./tail-assignment";
 
 export interface SimulationResult {
   event: DisruptionEvent;
@@ -26,13 +28,60 @@ export interface MultiSimulationResult {
   feedback: SimulationFeedback | null;
 }
 
+function addImpactedFlight(
+  impactedById: Map<string, ImpactedFlight>,
+  flight: FlightLeg,
+  reasonCodes: string[],
+  blockingEndTime?: Date | null,
+): void {
+  const existing = impactedById.get(flight.flight_id);
+  if (existing) {
+    for (const reason of reasonCodes) {
+      if (!existing.reason_codes.includes(reason)) {
+        existing.reason_codes.push(reason);
+      }
+    }
+    if (
+      blockingEndTime &&
+      (!existing.blocking_end_time || blockingEndTime > existing.blocking_end_time)
+    ) {
+      existing.blocking_end_time = blockingEndTime;
+    }
+  } else {
+    impactedById.set(flight.flight_id, {
+      flight,
+      reason_codes: [...reasonCodes],
+      blocking_end_time: blockingEndTime ?? null,
+    });
+  }
+}
+
+function addDownstreamRotationImpacts(
+  impactedById: Map<string, ImpactedFlight>,
+  impacted: ImpactedFlight,
+  scheduleIndex: ReturnType<typeof buildScheduleIndex>,
+): void {
+  const rotation = getAircraftRotation(scheduleIndex, impacted.flight.aircraft_id);
+  let downstreamStarted = false;
+  for (const flight of rotation) {
+    if (flight.flight_id === impacted.flight.flight_id) downstreamStarted = true;
+    if (!downstreamStarted) continue;
+    if (isOperatedFlight(flight)) continue;
+    addImpactedFlight(impactedById, flight, [
+      ...impacted.reason_codes,
+      `Downstream rotation affected by multi-event recovery from flight ${impacted.flight.flight_number}`,
+    ], flight.flight_id === impacted.flight.flight_id ? impacted.blocking_end_time : null);
+  }
+}
+
 export function runSimulation(input: {
   schedule: FlightLeg[];
   aircraft: Aircraft[];
   disruption: DisruptionEvent;
   rules: OccRules;
+  tailAssignmentMode?: TailAssignmentMode;
 }): SimulationResult {
-  const { schedule, aircraft, disruption, rules } = input;
+  const { schedule, aircraft, disruption, rules, tailAssignmentMode } = input;
   const scheduleIndex = buildScheduleIndex(schedule);
   const impacted = findImpactedFlights(
     disruption,
@@ -47,6 +96,7 @@ export function runSimulation(input: {
     aircraft,
     rules,
     scheduleIndex,
+    { tailAssignmentMode },
   );
   const ranked = rankRecoveryOptions(generated.options, rules, schedule);
   return {
@@ -74,8 +124,9 @@ export function runMultiEventSimulation(input: {
   aircraft: Aircraft[];
   disruptions: DisruptionEvent[];
   rules: OccRules;
+  tailAssignmentMode?: TailAssignmentMode;
 }): MultiSimulationResult {
-  const { schedule, aircraft, disruptions, rules } = input;
+  const { schedule, aircraft, disruptions, rules, tailAssignmentMode } = input;
 
   if (disruptions.length === 0) {
     return { events: [], impacted_flights: [], ranked_options: [], feedback: null };
@@ -97,6 +148,7 @@ export function runMultiEventSimulation(input: {
       aircraft,
       rules,
       scheduleIndex,
+      { tailAssignmentMode },
     );
     const ranked = rankRecoveryOptions(generated.options, rules, schedule);
     return {
@@ -111,19 +163,14 @@ export function runMultiEventSimulation(input: {
   const impactedById = new Map<string, ImpactedFlight>();
   for (const event of disruptions) {
     for (const im of findImpactedFlights(event, schedule, rules, scheduleIndex)) {
-      const key = im.flight.flight_id;
-      const existing = impactedById.get(key);
-      if (existing) {
-        for (const reason of im.reason_codes) {
-          if (!existing.reason_codes.includes(reason)) {
-            existing.reason_codes.push(reason);
-          }
-        }
-      } else {
-        impactedById.set(key, {
-          flight: im.flight,
-          reason_codes: [...im.reason_codes],
-        });
+      addImpactedFlight(
+        impactedById,
+        im.flight,
+        im.reason_codes,
+        im.blocking_end_time,
+      );
+      if (event.event_type === "AOG" || event.event_type === "LATE_ARRIVAL") {
+        addDownstreamRotationImpacts(impactedById, im, scheduleIndex);
       }
     }
   }
@@ -137,13 +184,13 @@ export function runMultiEventSimulation(input: {
   const endMs = Math.max(...disruptions.map((d) => d.end_time.getTime()));
   const combined: DisruptionEvent = {
     event_id: "MULTI",
-    event_type: "AOG",
+    event_type: disruptions.some((d) => d.event_type === "WEATHER" || d.event_type === "AIRPORT_CLOSE") ? "WEATHER" : "AOG",
     start_time: new Date(startMs),
     end_time: new Date(endMs),
     severity: "HIGH",
     description: `Combined window of ${disruptions.length} events`,
     affected_aircraft: null,
-    affected_airport: null,
+    affected_airport: disruptions.find((d) => d.affected_airport)?.affected_airport ?? null,
     affected_flight_id: null,
   };
 
@@ -164,6 +211,7 @@ export function runMultiEventSimulation(input: {
     usableAircraft,
     rules,
     scheduleIndex,
+    { tailAssignmentMode },
   );
   const ranked = rankRecoveryOptions(generated.options, rules, schedule);
 
@@ -185,6 +233,8 @@ export {
 export { generateRecoveryOptions } from "./recovery-option-generator";
 export { rankRecoveryOptions, calculateRecoveryScore } from "./option-scorer";
 export { buildScheduleIndex } from "./schedule-index";
+export { optimizeTailAssignment } from "./tail-assignment";
+export type { AircraftRecoveryObjective, TailAssignmentMode } from "./tail-assignment";
 export {
   isInCurfew,
   getAirportUtcOffsetHours,

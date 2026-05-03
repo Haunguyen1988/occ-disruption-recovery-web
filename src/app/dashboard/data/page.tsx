@@ -12,6 +12,8 @@ import {
   TEMPLATE_AIRCRAFT_CSV,
   TEMPLATE_DISRUPTION_CSV,
   TEMPLATE_SCHEDULE_CSV,
+  summarizeScheduleQuality,
+  type ScheduleQualityReport,
   type ValidationIssue,
 } from "@/lib/parsers/csv";
 
@@ -67,6 +69,10 @@ export default function DataPage() {
   const visibleAircraft = useMemo(
     () => aircraft.slice(aircraftStart, aircraftStart + PREVIEW_PAGE_SIZE),
     [aircraft, aircraftStart],
+  );
+  const scheduleQuality = useMemo(
+    () => summarizeScheduleQuality(schedule),
+    [schedule],
   );
 
   async function handleSaveAll() {
@@ -263,6 +269,8 @@ export default function DataPage() {
         emptyHint="No parser issues."
       />
 
+      {schedule.length > 0 && <ImportQualityPanel report={scheduleQuality} />}
+
       {validation.length > 0 && (
         <div className="rounded-lg border border-border p-4">
           <h3 className="font-semibold text-sm">Cross-dataset validation</h3>
@@ -307,6 +315,9 @@ export default function DataPage() {
                 <th className="p-2">aircraft</th>
                 <th className="p-2">prio</th>
                 <th className="p-2">LF</th>
+                <th className="p-2">pax</th>
+                <th className="p-2">conn</th>
+                <th className="p-2">VIP/SSR</th>
               </tr>
             </thead>
             <tbody>
@@ -330,6 +341,19 @@ export default function DataPage() {
                   </td>
                   <td className="p-2">{f.priority_level}</td>
                   <td className="p-2">{(f.load_factor * 100).toFixed(0)}%</td>
+                  <td className="p-2">
+                    {formatPassengerCount(f.booked_passengers)}
+                    {typeof f.seat_capacity === "number" && (
+                      <span className="text-zinc-500">/{f.seat_capacity}</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {formatPassengerCount(f.connecting_passengers)}
+                  </td>
+                  <td className="p-2">
+                    {formatPassengerCount(f.vip_passengers)}/
+                    {formatPassengerCount(f.special_service_passengers)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -386,6 +410,79 @@ export default function DataPage() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function formatPassengerCount(value: number | undefined): string {
+  return typeof value === "number" ? String(value) : "-";
+}
+
+function ImportQualityPanel({ report }: { report: ScheduleQualityReport }) {
+  const passengerCoverage =
+    report.flight_count === 0
+      ? 0
+      : Math.round(
+          (report.flights_with_any_passenger_data / report.flight_count) * 100,
+        );
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-sm">Import quality report</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Passenger impact uses booked passengers when available, otherwise
+            falls back to seat capacity and load factor.
+          </p>
+        </div>
+        <span
+          className={cn(
+            "rounded px-2 py-0.5 text-xs",
+            passengerCoverage === 100
+              ? "bg-emerald-100 text-emerald-800"
+              : passengerCoverage > 0
+                ? "bg-amber-100 text-amber-800"
+                : "bg-zinc-100 text-zinc-700",
+          )}
+        >
+          {passengerCoverage}% passenger coverage
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <QualityStat label="Flights" value={String(report.flight_count)} />
+        <QualityStat
+          label="Passenger rows"
+          value={String(report.flights_with_any_passenger_data)}
+        />
+        <QualityStat
+          label="Fallback rows"
+          value={String(report.using_load_factor_fallback)}
+        />
+        <QualityStat
+          label="Missing pax data"
+          value={String(report.flights_missing_passenger_data)}
+        />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600">
+        <span>seat capacity: {report.passenger_field_counts.seat_capacity}</span>
+        <span>booked: {report.passenger_field_counts.booked_passengers}</span>
+        <span>
+          connecting: {report.passenger_field_counts.connecting_passengers}
+        </span>
+        <span>VIP: {report.passenger_field_counts.vip_passengers}</span>
+        <span>
+          SSR: {report.passenger_field_counts.special_service_passengers}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function QualityStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-border p-3">
+      <div className="text-[11px] uppercase text-zinc-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
     </div>
   );
 }

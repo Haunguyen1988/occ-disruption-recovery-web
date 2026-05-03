@@ -78,6 +78,15 @@ interface FlightRow {
   load_factor: number;
   is_international: boolean;
   is_last_flight_of_day: boolean;
+  seat_capacity: number | null;
+  booked_passengers: number | null;
+  connecting_passengers: number | null;
+  vip_passengers: number | null;
+  special_service_passengers: number | null;
+  captain: string | null;
+  first_officer: string | null;
+  actual_departure_time: string | null;
+  actual_arrival_time: string | null;
 }
 
 interface AircraftRow {
@@ -141,7 +150,7 @@ export async function loadOperationalData(): Promise<OperationalDataResult | nul
       supabase
         .from("flights")
         .select(
-          "flight_id, flight_number, origin, destination, std, sta, aircraft_id, aircraft_type, priority_level, load_factor, is_international, is_last_flight_of_day",
+          "flight_id, flight_number, origin, destination, std, sta, aircraft_id, aircraft_type, priority_level, load_factor, is_international, is_last_flight_of_day, seat_capacity, booked_passengers, connecting_passengers, vip_passengers, special_service_passengers, captain, first_officer, actual_departure_time, actual_arrival_time",
         )
         .order("std", { ascending: true }),
       supabase
@@ -182,6 +191,19 @@ export async function loadOperationalData(): Promise<OperationalDataResult | nul
       load_factor: Number(row.load_factor),
       is_international: row.is_international,
       is_last_flight_of_day: row.is_last_flight_of_day,
+      seat_capacity: row.seat_capacity ?? undefined,
+      booked_passengers: row.booked_passengers ?? undefined,
+      connecting_passengers: row.connecting_passengers ?? undefined,
+      vip_passengers: row.vip_passengers ?? undefined,
+      special_service_passengers: row.special_service_passengers ?? undefined,
+      captain: row.captain ?? undefined,
+      first_officer: row.first_officer ?? undefined,
+      actual_departure_time: row.actual_departure_time
+        ? new Date(row.actual_departure_time)
+        : undefined,
+      actual_arrival_time: row.actual_arrival_time
+        ? new Date(row.actual_arrival_time)
+        : undefined,
     }));
 
     const aircraft: Aircraft[] = (planes ?? []).map((row: AircraftRow) => ({

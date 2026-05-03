@@ -6,19 +6,22 @@
 
 | File | Purpose |
 |---|---|
-| `../UAT_PLAN.md` | Test plan with 7 scenarios, severity rubric, sign-off rules |
+| `../UAT_PLAN.md` | Test plan with 8 scenarios, severity rubric, sign-off rules |
 | `../UAT_BUG_REPORT_TEMPLATE.md` | Per-defect template (copy per bug) |
 | `../UAT_REPORT_TEMPLATE.md` | Per-round summary (sign-off) |
 | `uat_seed.sql` | Assigns roles to UAT users after they're created in Supabase |
-| `uat_preflight_check.sql` | Read-only check for migrations, approval RPC, and UAT user roles |
+| `uat_preflight_check.sql` | Read-only check for migrations, passenger/crew/actual-time columns, approval RPC, and UAT user roles |
 | `uat_cleanup.sql` | Wipes UAT-generated rows after sign-off |
 | `../../public/uat/uat_scenario_aog.csv` | S1 disruption fixture (AOG VN-A537) |
 | `../../public/uat/uat_scenario_weather.csv` | S2 weather fixture (HAN closure) |
 | `../../public/uat/uat_scenario_broken_schedule.csv` | S6 broken-CSV fixture (5 issues) |
+| `../../public/uat/uat_tail_assignment_schedule.csv` | S8 tail-assignment schedule fixture |
+| `../../public/uat/uat_tail_assignment_aircraft.csv` | S8 tail-assignment aircraft fixture |
+| `../../public/uat/uat_scenario_tail_assignment.csv` | S8 tail-assignment disruption fixture |
 
 ## Quick start
 
-1. Pre-flight (a day before): apply Supabase migrations through `0003_approval_safety.sql`, create 3 auth users in Supabase, run `uat_seed.sql`, then run `uat_preflight_check.sql`.
+1. Pre-flight (a day before): apply Supabase migrations through `0007_actual_times.sql`, create 3 auth users in Supabase, run `uat_seed.sql`, then run `uat_preflight_check.sql`.
 2. Open `UAT_PLAN.md` and walk each scenario sequentially with the testers.
 3. File defects using `UAT_BUG_REPORT_TEMPLATE.md` (one per issue).
 4. Wrap up by filling `UAT_REPORT_TEMPLATE.md` with verdicts + sign-off.

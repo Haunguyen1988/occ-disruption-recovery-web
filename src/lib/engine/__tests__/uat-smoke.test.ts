@@ -5,12 +5,13 @@ import { runMultiEventSimulation, runSimulation } from "@/lib/engine";
 import { tryParseAimsWorkbook } from "@/lib/parsers/aims";
 import {
   parseCsvOrXlsx,
+  parseAircraftRows,
   parseDisruptionRows,
   parseScheduleRows,
 } from "@/lib/parsers/csv";
 import { getDefaultRules } from "@/lib/parsers/rules";
 import type { AimsParseResult } from "@/lib/parsers/aims";
-import type { DisruptionEvent } from "@/lib/types";
+import type { Aircraft, DisruptionEvent, FlightLeg } from "@/lib/types";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 const RULES = getDefaultRules();
@@ -47,6 +48,26 @@ async function loadUatDisruption(fileName: string): Promise<DisruptionEvent> {
   expect(parsed.issues.filter((issue) => issue.level === "error")).toEqual([]);
   expect(parsed.data).toHaveLength(1);
   return parsed.data[0];
+}
+
+async function loadUatSchedule(fileName: string): Promise<FlightLeg[]> {
+  const rows = await parseCsvOrXlsx(
+    fileFromRepo(path.join("public", "uat", fileName), "text/csv"),
+  );
+  const parsed = parseScheduleRows(rows);
+  expect(parsed.issues.filter((issue) => issue.level === "error")).toEqual([]);
+  expect(parsed.data.length).toBeGreaterThan(0);
+  return parsed.data;
+}
+
+async function loadUatAircraft(fileName: string): Promise<Aircraft[]> {
+  const rows = await parseCsvOrXlsx(
+    fileFromRepo(path.join("public", "uat", fileName), "text/csv"),
+  );
+  const parsed = parseAircraftRows(rows);
+  expect(parsed.issues.filter((issue) => issue.level === "error")).toEqual([]);
+  expect(parsed.data.length).toBeGreaterThan(0);
+  return parsed.data;
 }
 
 describe("UAT smoke scenarios", () => {
@@ -105,6 +126,29 @@ describe("UAT smoke scenarios", () => {
     expect(result.ranked_options.map((option) => option.option_type)).toEqual(
       expect.arrayContaining(["DELAY_ONLY", "SPREAD_DELAY", "DEEP_DELAY"]),
     );
+
+    const optimizer = result.feedback?.tail_assignment;
+    expect(optimizer).toBeDefined();
+    expect(optimizer!.attempted).toBe(true);
+    expect(optimizer!.horizon_flight_count).toBeGreaterThan(100);
+    expect(optimizer!.aircraft_count).toBeGreaterThan(50);
+    expect(optimizer!.original_arc_count).toBeGreaterThan(
+      optimizer!.reduced_arc_count,
+    );
+    expect(optimizer!.initial_path_count).toBeGreaterThan(0);
+    expect(optimizer!.final_path_count).toBeLessThanOrEqual(
+      optimizer!.initial_path_count,
+    );
+    expect(optimizer!.required_flight_count).toBeGreaterThan(100);
+    expect(optimizer!.best_covered_flight_count).toBeLessThanOrEqual(
+      optimizer!.required_flight_count,
+    );
+    if (optimizer!.option_count === 0) {
+      expect(optimizer!.no_option_reason).toContain(
+        "No complete aircraft-path combination",
+      );
+      expect(optimizer!.top_blocking_reasons.length).toBeGreaterThan(0);
+    }
   });
 
   it("runs the combined AOG + HAN closure UAT scenario and preserves both event reasons", async () => {
@@ -145,5 +189,43 @@ describe("UAT smoke scenarios", () => {
         impacted.reason_codes.some((reason) => reason.includes("AOG aircraft")),
       ),
     ).toBe(true);
+  });
+
+  it("runs the tail-assignment UAT fixture and generates an optimized option", async () => {
+    const schedule = await loadUatSchedule("uat_tail_assignment_schedule.csv");
+    const aircraft = await loadUatAircraft("uat_tail_assignment_aircraft.csv");
+    const disruption = await loadUatDisruption("uat_scenario_tail_assignment.csv");
+
+    const result = runSimulation({
+      schedule,
+      aircraft,
+      disruption,
+      rules: RULES,
+    });
+    const tail = result.ranked_options.find(
+      (option) => option.option_type === "TAIL_ASSIGNMENT_OPTIMIZED",
+    );
+
+    expect(result.feedback?.tail_assignment).toEqual(
+      expect.objectContaining({
+        no_option_reason: null,
+      }),
+    );
+    expect(tail).toBeDefined();
+    expect(tail!.rank).toBeLessThanOrEqual(3);
+    expect(tail!.flight_changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          flight_id: "TAIL-F1",
+          new_aircraft: "TAIL-B",
+        }),
+        expect.objectContaining({
+          flight_id: "TAIL-G1",
+          new_aircraft: "TAIL-A",
+        }),
+      ]),
+    );
+    expect(result.feedback?.tail_assignment?.option_count).toBeGreaterThan(0);
+    expect(result.feedback?.tail_assignment?.no_option_reason).toBeNull();
   });
 });

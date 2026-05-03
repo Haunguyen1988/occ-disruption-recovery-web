@@ -3,10 +3,10 @@
 **Audience:** 2–3 OCC controllers (1 OCC duty controller, 1 OCC supervisor, 1 viewer).
 **Duration:** ~90 minutes (60 min execution + 30 min debrief).
 **Build under test:** `bootstrap-main` (post Sprint 8-A merge), deployed at `<UAT_URL>`.
-**Fixtures:** `public/uat/*` and `src/lib/parsers/__tests__/fixtures/aims_dayrep_sample.xlsx` (real AIMS DayRep, 28-Apr-2026, 325 flights).
+**Fixtures:** `public/uat/*` and `src/lib/parsers/__tests__/fixtures/aims_dayrep_sample.xlsx` (real AIMS DayRep, 28-Apr-2026, 325 flights). Tail-assignment focused fixtures: `public/uat/uat_tail_assignment_schedule.csv`, `public/uat/uat_tail_assignment_aircraft.csv`, and `public/uat/uat_scenario_tail_assignment.csv`.
 
 > **Pre-flight (1 day before UAT)**
-> 1. Run `supabase/migrations/0001_init.sql`, `0002_curfew_and_multi_event.sql`, and `0003_approval_safety.sql` against the UAT Supabase project in order.
+> 1. Run migrations in `supabase/migrations/` against the UAT Supabase project in order through `0007_actual_times.sql`.
 > 2. Run `docs/uat/uat_seed.sql` to provision UAT users (`uat-controller@vietjet.com`, `uat-supervisor@vietjet.com`, `uat-viewer@vietjet.com`) and assign roles.
 > 3. Run `docs/uat/uat_preflight_check.sql` and make sure every schema check returns `OK`, while every UAT user row returns `OK`.
 > 4. Confirm `<UAT_URL>` is reachable, `/login` works, and the AIMS DayRep upload returns the blue "Loaded 325 flights / 73 aircraft" banner.
@@ -135,6 +135,24 @@ Severity is the *worst-case* impact if the step fails: `Sev1 = blocks rollout`, 
 | 3 | `/dashboard/schedule` → Gantt → hover any leg | Tooltip shows `<flightnr> · ORG→DEST · HH:MM ORG / HH:MM DEST · …`; hour ticks across the top remain in UTC | Sev2 |
 | 4 | Footer caption | "Canvas: UTC · Tooltip: airport-local" caption is visible | Sev3 |
 | 5 | Add an NRT curfew (e.g. 23:00–06:00) in `/dashboard/rules`, run sim with a flight whose STA at NRT falls in that window | At least one option flags `CURFEW ×N` driven by NRT (not by VN-only airports) | Sev2 |
+
+---
+
+### S8 — Aircraft recovery optimized recovery
+
+**Persona:** Duty controller. **Goal:** Verify the network optimizer can build and rank feasible aircraft recovery paths, not only delay/swap heuristics.
+
+| # | Step | Pass criteria | Sev |
+|---|---|---|---|
+| 1 | `/dashboard/data` → upload `public/uat/uat_tail_assignment_schedule.csv` as Schedule | 5 flights imported, no parse errors | Sev1 |
+| 2 | Upload `public/uat/uat_tail_assignment_aircraft.csv` as Aircraft | 3 aircraft imported, no parse errors | Sev1 |
+| 3 | Upload `public/uat/uat_scenario_tail_assignment.csv` as Disruption | 1 AOG disruption parsed, no errors | Sev1 |
+| 4 | `/dashboard/simulate` → keep **Balanced** selected, then click **Run simulation** | `TAIL_ASSIGNMENT_OPTIMIZED` appears and is ranked #1 | Sev1 |
+| 5 | Inspect the aircraft recovery diagnostics panel | It shows horizon metrics, arc reduction, path counts, and no no-option warning | Sev2 |
+| 6 | Inspect the ranked option row and open option details | Ranking explanation says the tail option wins against the best non-tail delay/swap heuristic and lists the main score drivers/tradeoffs | Sev2 |
+| 7 | Inspect flight changes in option details | Flight `TAIL-F1` is reassigned to `TAIL-B`, and `TAIL-G1` is reassigned to `TAIL-A` | Sev2 |
+| 8 | Compare against Delay Only | Tail option has lower score than the best non-tail heuristic | Sev2 |
+| 9 | Re-run in **Fast** and **Deep** modes | Diagnostics panel mode label updates; ranked options still render without UI freeze | Sev2 |
 
 ---
 

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createSupabaseBrowserClient,
+  isAuthRequiredBrowser,
+  isStubModeAllowedBrowser,
   isSupabaseConfiguredBrowser,
 } from "@/lib/supabase/client";
 
@@ -15,13 +17,18 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const supabaseReady = isSupabaseConfiguredBrowser();
+  const stubModeAllowed = isStubModeAllowedBrowser();
+  const authRequired = isAuthRequiredBrowser();
+  const signInDisabled = busy || !supabaseReady;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     if (!supabaseReady) {
       setErr(
-        "Supabase environment variables not configured. Sign-in is disabled in stub mode; go directly to the dashboard.",
+        stubModeAllowed
+          ? "Supabase is not configured. Development stub mode is available below."
+          : "Supabase is not configured for this deployment. Dashboard access is locked until production auth is configured.",
       );
       return;
     }
@@ -56,9 +63,18 @@ export default function LoginPage() {
         <h1 className="text-2xl font-semibold">Sign in</h1>
         <p className="text-sm text-zinc-500 mt-1">
           {supabaseReady
-            ? "Use your team email to sign in."
-            : "Stub mode - Supabase not configured. You can still open the dashboard."}
+            ? "Use your team email to access the OCC dashboard."
+            : stubModeAllowed
+              ? "Development stub mode is available because Supabase is not configured."
+              : "Production auth is not configured. Dashboard access is locked."}
         </p>
+
+        {!supabaseReady && authRequired && (
+          <div className="mt-6 rounded-md border border-[color:var(--danger)] bg-red-50 p-3 text-sm text-red-900">
+            Configure `NEXT_PUBLIC_SUPABASE_URL` and
+            `NEXT_PUBLIC_SUPABASE_ANON_KEY` before using this deployment.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-3">
           <input
@@ -68,6 +84,7 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm"
             required
+            disabled={!supabaseReady}
           />
           <input
             type="password"
@@ -76,23 +93,24 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm"
             required
+            disabled={!supabaseReady}
           />
           {err && <p className="text-xs text-[color:var(--danger)]">{err}</p>}
           <button
             type="submit"
-            disabled={busy}
+            disabled={signInDisabled}
             className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90"
           >
             {busy ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        {!supabaseReady && (
+        {!supabaseReady && stubModeAllowed && (
           <Link
             href="/dashboard"
             className="mt-4 block text-center text-sm text-zinc-500 hover:underline"
           >
-            Continue without signing in
+            Open development dashboard
           </Link>
         )}
       </div>

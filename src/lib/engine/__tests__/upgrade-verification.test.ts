@@ -1,5 +1,5 @@
 /**
- * Quick smoke test for the engine upgrades (S2, S3, S5, A1, A2).
+ * Quick smoke test for the engine upgrades (S2, S3, S5, A1).
  * Run with: node .\node_modules\vitest\dist\cli-wrapper.js run src/lib/engine/__tests__/upgrade-verification.test.ts
  */
 import { describe, it, expect } from "vitest";
@@ -111,12 +111,17 @@ describe("Engine upgrade verification", () => {
   it("S3: DEEP_DELAY should sacrifice lowest-priority, lowest-load flight", () => {
     const deep = result.ranked_options.find((o) => o.option_type === "DEEP_DELAY")!;
     expect(deep).toBeDefined();
-    expect(deep.flight_changes.length).toBe(1);
-    const sacrificed = deep.flight_changes[0];
-    console.log(`\nDEEP_DELAY sacrifices: ${sacrificed.flight_number} (delay: ${sacrificed.delay_minutes}min)`);
+    expect(deep.flight_changes.length).toBeGreaterThanOrEqual(
+      result.impacted_flights.length,
+    );
+    const sacrificed = deep.flight_changes.find(
+      (change) => change.reason === "Deep-delay selected low-priority flight",
+    );
+    expect(sacrificed).toBeDefined();
+    console.log(`\nDEEP_DELAY sacrifices: ${sacrificed!.flight_number} (delay: ${sacrificed!.delay_minutes}min)`);
     // FL004 VJ103 has priority_level=3 (lowest) and load_factor=0.75 (lowest among P3)
     // With the fix, it should pick the lowest-load flight among lowest-priority
-    expect(sacrificed.flight_number).toBe("VJ103");
+    expect(sacrificed!.flight_number).toBe("VJ103");
   });
 
   it("S5: scorer should include priority_protection_penalty", () => {
@@ -139,8 +144,7 @@ describe("Engine upgrade verification", () => {
     console.log(`\nSINGLE_SWAP options: ${swaps.length}`);
     swaps.forEach((s) => {
       const target = s.reason_codes[0] ?? "";
-      const isHybrid = s.reason_codes.some((r) => r.includes("Partial swap"));
-      console.log(`  ${s.option_id}: ${target}${isHybrid ? " [HYBRID]" : ""}`);
+      console.log(`  ${s.option_id}: ${target}`);
     });
   });
 

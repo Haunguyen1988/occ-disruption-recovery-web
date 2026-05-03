@@ -16,6 +16,7 @@ import {
   resolveScheduleIndex,
   type ScheduleIndex,
 } from "./schedule-index";
+import { isOperatedFlight } from "./flight-status";
 
 function randomId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -56,6 +57,20 @@ function recalculateMetrics(option: RecoveryOption): void {
   option.swap_count = Object.keys(option.aircraft_changes).length;
 }
 
+function blockingEndByFlightId(
+  impacted: ImpactedFlight[],
+  fallbackEndTime: Date,
+): Map<string, Date | null> {
+  return new Map(
+    impacted.map((item) => [
+      item.flight.flight_id,
+      item.blocking_end_time === undefined
+        ? fallbackEndTime
+        : item.blocking_end_time,
+    ]),
+  );
+}
+
 /**
  * Bug fix K2: only propagate delay through the rotation(s) of impacted aircraft,
  * not all aircraft in the schedule. This produces operationally realistic
@@ -70,6 +85,10 @@ export function simulateDelayOnly(
 ): RecoveryOption {
   const index = resolveScheduleIndex(schedule, scheduleIndex);
   const impactedIds = new Set(impacted.map((i) => i.flight.flight_id));
+  const blockEndByFlightId = blockingEndByFlightId(
+    impacted,
+    disruption.end_time,
+  );
   const impactedAircraftIds = new Set(
     impacted.map((i) => i.flight.aircraft_id),
   );
@@ -80,6 +99,11 @@ export function simulateDelayOnly(
     let previousNewSta: Date | null = null;
     let delayCarry = 0;
     for (const flight of rotation) {
+      if (isOperatedFlight(flight)) {
+        previousNewSta = flight.actual_arrival_time ?? flight.sta;
+        delayCarry = 0;
+        continue;
+      }
       if (!impactedIds.has(flight.flight_id) && delayCarry === 0) {
         previousNewSta = flight.sta;
         continue;
@@ -87,8 +111,11 @@ export function simulateDelayOnly(
       const minTurn = minTurnaroundForType(flight.aircraft_type, rules);
       let requiredStd = flight.std;
       if (impactedIds.has(flight.flight_id)) {
-        const blockEnd = addMinutes(disruption.end_time, minTurn);
-        if (blockEnd > requiredStd) requiredStd = blockEnd;
+        const flightBlockEnd = blockEndByFlightId.get(flight.flight_id);
+        if (flightBlockEnd) {
+          const blockEnd = addMinutes(flightBlockEnd, minTurn);
+          if (blockEnd > requiredStd) requiredStd = blockEnd;
+        }
       }
       if (previousNewSta) {
         const turnEnd = addMinutes(previousNewSta, minTurn);
@@ -149,6 +176,10 @@ export function simulateSpreadDelay(
 ): RecoveryOption {
   const index = resolveScheduleIndex(schedule, scheduleIndex);
   const impactedIds = new Set(impacted.map((i) => i.flight.flight_id));
+  const blockEndByFlightId = blockingEndByFlightId(
+    impacted,
+    disruption.end_time,
+  );
   const impactedAircraftIds = new Set(
     impacted.map((i) => i.flight.aircraft_id),
   );
@@ -173,6 +204,11 @@ export function simulateSpreadDelay(
     let prevNewSta: Date | null = null;
     let delayCarry = 0;
     for (const flight of rotation) {
+      if (isOperatedFlight(flight)) {
+        prevNewSta = flight.actual_arrival_time ?? flight.sta;
+        delayCarry = 0;
+        continue;
+      }
       if (!impactedIds.has(flight.flight_id) && delayCarry === 0) {
         prevNewSta = flight.sta;
         continue;
@@ -180,8 +216,11 @@ export function simulateSpreadDelay(
       const minTurn = minTurnaroundForType(flight.aircraft_type, rules);
       let requiredStd = flight.std;
       if (impactedIds.has(flight.flight_id)) {
-        const blockEnd = addMinutes(disruption.end_time, minTurn);
-        if (blockEnd > requiredStd) requiredStd = blockEnd;
+        const flightBlockEnd = blockEndByFlightId.get(flight.flight_id);
+        if (flightBlockEnd) {
+          const blockEnd = addMinutes(flightBlockEnd, minTurn);
+          if (blockEnd > requiredStd) requiredStd = blockEnd;
+        }
       }
       if (prevNewSta) {
         const turnEnd = addMinutes(prevNewSta, minTurn);
@@ -267,8 +306,9 @@ export function simulateSpreadDelay(
 export function simulateDeepDelay(
   impacted: ImpactedFlight[],
   disruption: DisruptionEvent,
-  _schedule: FlightLeg[],
+  schedule: FlightLeg[],
   rules: OccRules,
+  scheduleIndex?: ScheduleIndex,
 ): RecoveryOption {
   if (!impacted.length) {
     return {
@@ -301,35 +341,57 @@ export function simulateDeepDelay(
     });
   const selected = sorted[sorted.length - 1];
   const minTurn = minTurnaroundForType(selected.aircraft_type, rules);
+  const selectedImpact = impacted.find(
+    (item) => item.flight.flight_id === selected.flight_id,
+  );
   const targetStd = (() => {
-    const blockEnd = addMinutes(disruption.end_time, minTurn);
+    const flightBlockEnd =
+      selectedImpact?.blocking_end_time === undefined
+        ? disruption.end_time
+        : selectedImpact.blocking_end_time;
+    if (!flightBlockEnd) return selected.std;
+    const blockEnd = addMinutes(flightBlockEnd, minTurn);
     return blockEnd > selected.std ? blockEnd : selected.std;
   })();
   let delay = Math.max(0, minutesBetween(selected.std, targetStd));
   const deepLimit = rules.flat_delay_rules?.max_deep_delay_minutes ?? 360;
   delay = Math.min(Math.max(delay, Math.floor(deepLimit * 0.5)), deepLimit);
-  const change = flightChangeFromDelay(
-    selected,
-    delay,
-    "Deep-delay selected low-priority flight",
+  const index = resolveScheduleIndex(schedule, scheduleIndex);
+  const baseline = simulateDelayOnly(impacted, disruption, schedule, rules, index);
+  const changesByFlightId = new Map(
+    baseline.flight_changes.map((change) => [change.flight_id, change]),
+  );
+  const existingSelectedDelay =
+    changesByFlightId.get(selected.flight_id)?.delay_minutes ?? 0;
+  const selectedDelay = Math.max(delay, existingSelectedDelay);
+  changesByFlightId.set(
+    selected.flight_id,
+    flightChangeFromDelay(
+      selected,
+      selectedDelay,
+      "Deep-delay selected low-priority flight",
+    ),
+  );
+  const changes = [...changesByFlightId.values()].sort(
+    (a, b) => a.original_std.getTime() - b.original_std.getTime(),
   );
   const option: RecoveryOption = {
     option_id: randomId("OPT-DEEP"),
     option_type: "DEEP_DELAY",
-    flight_changes: [change],
+    flight_changes: changes,
     aircraft_changes: {},
     total_delay_minutes: 0,
     max_delay_minutes: 0,
     impacted_flight_count: 0,
     swap_count: 0,
     curfew_violations: 0,
-    risk_level: delay > 180 ? "HIGH" : "MEDIUM",
+    risk_level: selectedDelay > 180 ? "HIGH" : "MEDIUM",
     score: 0,
     rank: null,
     recommendation: "",
     reason_codes: [
       `Select lower-priority flight ${selected.flight_number} to absorb deeper delay`,
-      "Use this option when network protection is more important than single-flight delay",
+      "Delay propagation remains applied to every impacted aircraft rotation",
     ],
     score_breakdown: {},
   };

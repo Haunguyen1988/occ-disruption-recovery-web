@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "benchmark:tail": "node scripts/run-tail-benchmark.cjs",
+    "verify:prod": "node scripts/run-prod-verify.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

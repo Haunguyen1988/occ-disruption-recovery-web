@@ -10,6 +10,7 @@ export type OptionType =
   | "DEEP_DELAY"
   | "SINGLE_SWAP"
   | "SWAP_CHAIN"
+  | "TAIL_ASSIGNMENT_OPTIMIZED"
   | "CANCEL_OR_FERRY";
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
@@ -29,6 +30,15 @@ export interface FlightLeg {
   load_factor: number;
   is_international: boolean;
   is_last_flight_of_day: boolean;
+  seat_capacity?: number;
+  booked_passengers?: number;
+  connecting_passengers?: number;
+  vip_passengers?: number;
+  special_service_passengers?: number;
+  captain?: string;
+  first_officer?: string;
+  actual_departure_time?: Date;
+  actual_arrival_time?: Date;
 }
 
 export interface Aircraft {
@@ -56,6 +66,12 @@ export interface DisruptionEvent {
 export interface ImpactedFlight {
   flight: FlightLeg;
   reason_codes: string[];
+  /**
+   * Event-specific time when this flight's direct operational block clears.
+   * Downstream rotation impacts may omit this so delay is carried from the
+   * preceding leg instead of being forced to a combined multi-event end time.
+   */
+  blocking_end_time?: Date | null;
 }
 
 export interface CandidateAircraft {
@@ -75,6 +91,31 @@ export interface SwapCandidateDiagnostic {
   reason_codes: string[];
 }
 
+export interface TailAssignmentOptimizationFeedback {
+  attempted: boolean;
+  mode: "fast" | "balanced" | "deep";
+  option_count: number;
+  no_option_reason: string | null;
+  required_flight_count: number;
+  best_covered_flight_count: number;
+  complete_solution_count: number;
+  top_blocking_reasons: { reason: string; count: number }[];
+  horizon_flight_count: number;
+  aircraft_count: number;
+  original_arc_count: number;
+  reduced_arc_count: number;
+  removed_arc_count: number;
+  arc_reduction_pct: number;
+  path_count: number;
+  search_nodes: number;
+  connection_fixing_applied: boolean;
+  fixed_connection_count: number;
+  initial_path_count: number;
+  final_path_count: number;
+  initial_search_nodes: number;
+  final_search_nodes: number;
+}
+
 export interface SimulationFeedback {
   swap_target_flight_id: string | null;
   swap_target_flight_number: string | null;
@@ -82,6 +123,7 @@ export interface SimulationFeedback {
   feasible_swap_count: number;
   candidate_count: number;
   candidates: SwapCandidateDiagnostic[];
+  tail_assignment: TailAssignmentOptimizationFeedback | null;
 }
 
 export interface FlightChange {
@@ -97,6 +139,26 @@ export interface FlightChange {
   new_sta: Date;
   delay_minutes: number;
   reason: string;
+}
+
+export interface FlightPassengerImpact {
+  flight_id: string;
+  flight_number: string;
+  estimated_passengers: number;
+  affected_passengers: number;
+  passenger_delay_minutes: number;
+  misconnect_risk_passengers: number;
+  priority_passenger_score: number;
+  reason_codes: string[];
+}
+
+export interface PassengerImpact {
+  estimated_affected_passengers: number;
+  passenger_delay_minutes: number;
+  misconnect_risk_passengers: number;
+  priority_passenger_score: number;
+  high_impact: boolean;
+  top_impacted_flights: FlightPassengerImpact[];
 }
 
 export interface RecoveryOption {
@@ -115,6 +177,7 @@ export interface RecoveryOption {
   recommendation: string;
   reason_codes: string[];
   score_breakdown: Record<string, number>;
+  passenger_impact?: PassengerImpact;
 }
 
 export interface OccRules {
@@ -144,6 +207,17 @@ export interface OccRules {
     high_load_factor_threshold: number;
     protect_international_flight: boolean;
   };
+  passenger_rules?: {
+    enabled: boolean;
+    default_seat_capacity_by_type: Record<string, number>;
+    fallback_seat_capacity: number;
+    misconnect_delay_threshold_minutes: number;
+    high_impact_passenger_threshold: number;
+    international_priority_multiplier: number;
+    last_flight_priority_multiplier: number;
+    vip_priority_multiplier: number;
+    special_service_priority_multiplier: number;
+  };
   spread_delay_rules: {
     enabled: boolean;
     max_delay_per_flight_minutes: number;
@@ -161,5 +235,8 @@ export interface OccRules {
     closure_violation_penalty: number;
     curfew_risk_penalty: number;
     priority_protection_bonus: number;
+    passenger_delay_weight?: number;
+    passenger_priority_weight?: number;
+    misconnect_risk_penalty?: number;
   };
 }

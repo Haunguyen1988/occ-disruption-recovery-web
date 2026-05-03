@@ -6,7 +6,7 @@ import {
   loadOperationalData,
   type OperationalLoadError,
 } from "@/lib/supabase/queries";
-import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { isStubModeAllowed, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
@@ -17,6 +17,9 @@ export default async function DashboardLayout({
   const session = configured ? await getSession() : null;
   if (configured && !session) {
     redirect("/login");
+  }
+  if (!configured && !isStubModeAllowed()) {
+    redirect("/login?configuration=missing");
   }
   const initial = session ? await loadOperationalData() : null;
   const initialData = initial?.data ?? null;

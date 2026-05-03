@@ -5,6 +5,7 @@ import type {
   OccRules,
 } from "@/lib/types";
 import { overlaps } from "./time-utils";
+import { isOperatedFlight } from "./flight-status";
 import { getProjectedStation } from "./candidate-finder";
 import {
   getAircraftRotation,
@@ -65,6 +66,7 @@ function findAogImpacts(
     : `Aircraft at ${projStation} when AOG reported`;
 
   for (const flight of rotation) {
+    if (isOperatedFlight(flight)) continue;
     // A flight is impacted ONLY if:
     //   1) Its time range overlaps the AOG window, OR
     //   2) Its STD falls within the AOG window
@@ -79,9 +81,15 @@ function findAogImpacts(
       flight.std >= disruption.start_time &&
       flight.std < disruption.end_time;
 
-    if (directOverlap || startsDuring) {
+    const matchesAogAirport =
+      !disruption.affected_airport ||
+      flight.origin === disruption.affected_airport ||
+      flight.destination === disruption.affected_airport;
+
+    if ((directOverlap || startsDuring) && matchesAogAirport) {
       impacted.push({
         flight,
+        blocking_end_time: disruption.end_time,
         reason_codes: [
           `AOG aircraft ${disruption.affected_aircraft} unavailable from ${disruption.start_time.toISOString()} to ${disruption.end_time.toISOString()}`,
           `Flight ${flight.flight_number} (${flight.origin}→${flight.destination}) STD ${flight.std.toISOString()} falls within AOG window`,
@@ -103,6 +111,7 @@ function findAirportImpacts(
     disruption.event_type === "WEATHER" ? "Weather risk" : "Airport closure";
   const impacted: ImpactedFlight[] = [];
   for (const flight of scheduleIndex.flightsByStd) {
+    if (isOperatedFlight(flight)) continue;
     const departureBlocked =
       flight.origin === airport &&
       flight.std >= disruption.start_time &&
@@ -119,7 +128,11 @@ function findAirportImpacts(
         reasons.push(`Departure from ${airport} falls within affected window`);
       if (arrivalBlocked)
         reasons.push(`Arrival into ${airport} falls within affected window`);
-      impacted.push({ flight, reason_codes: reasons });
+      impacted.push({
+        flight,
+        reason_codes: reasons,
+        blocking_end_time: disruption.end_time,
+      });
     }
   }
   return impacted;
@@ -131,15 +144,18 @@ function findLateArrivalImpacts(
 ): ImpactedFlight[] {
   if (!disruption.affected_flight_id) return [];
   const affected = scheduleIndex.flightsById.get(disruption.affected_flight_id);
-  if (!affected) return [];
+  if (!affected || isOperatedFlight(affected)) return [];
   const rotation = getAircraftRotation(scheduleIndex, affected.aircraft_id);
   const impacted: ImpactedFlight[] = [];
   let downstreamStarted = false;
   for (const flight of rotation) {
     if (flight.flight_id === affected.flight_id) downstreamStarted = true;
+    if (isOperatedFlight(flight)) continue;
     if (downstreamStarted) {
       impacted.push({
         flight,
+        blocking_end_time:
+          flight.flight_id === affected.flight_id ? disruption.end_time : null,
         reason_codes: [
           `Late arrival event starts from flight ${affected.flight_number}`,
           "Downstream same-aircraft rotation needs delay propagation check",

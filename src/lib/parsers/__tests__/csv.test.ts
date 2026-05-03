@@ -4,6 +4,7 @@ import {
   parseDisruptionRows,
   parseScheduleRows,
   rowsToDisruption,
+  summarizeScheduleQuality,
   validateDataset,
 } from "@/lib/parsers/csv";
 
@@ -27,6 +28,75 @@ describe("parseScheduleRows", () => {
     const r = parseScheduleRows([goodRow]);
     expect(r.data).toHaveLength(1);
     expect(r.issues).toHaveLength(0);
+  });
+
+  it("parses optional passenger fields when present", () => {
+    const r = parseScheduleRows([
+      {
+        ...goodRow,
+        seat_capacity: "230",
+        booked_passengers: "209",
+        connecting_passengers: "24",
+        vip_passengers: "2",
+        special_service_passengers: "3",
+      },
+    ]);
+    expect(r.issues).toHaveLength(0);
+    expect(r.data[0]).toMatchObject({
+      seat_capacity: 230,
+      booked_passengers: 209,
+      connecting_passengers: 24,
+      vip_passengers: 2,
+      special_service_passengers: 3,
+    });
+  });
+
+  it("parses optional crew pairing fields when present", () => {
+    const r = parseScheduleRows([
+      {
+        ...goodRow,
+        captain: " CAPT A ",
+        first_officer: " FO A ",
+      },
+    ]);
+
+    expect(r.issues).toHaveLength(0);
+    expect(r.data[0]).toMatchObject({
+      captain: "CAPT A",
+      first_officer: "FO A",
+    });
+  });
+
+  it("parses optional actual movement times when present", () => {
+    const r = parseScheduleRows([
+      {
+        ...goodRow,
+        atd: "2026-04-28T07:05:00Z",
+        ata: "2026-04-28T09:08:00Z",
+      },
+    ]);
+
+    expect(r.issues).toHaveLength(0);
+    expect(r.data[0].actual_departure_time?.toISOString()).toBe(
+      "2026-04-28T07:05:00.000Z",
+    );
+    expect(r.data[0].actual_arrival_time?.toISOString()).toBe(
+      "2026-04-28T09:08:00.000Z",
+    );
+  });
+
+  it("warns and ignores invalid optional passenger fields", () => {
+    const r = parseScheduleRows([
+      {
+        ...goodRow,
+        seat_capacity: "230.5",
+        booked_passengers: "-1",
+      },
+    ]);
+    expect(r.data).toHaveLength(1);
+    expect(r.data[0].seat_capacity).toBeUndefined();
+    expect(r.data[0].booked_passengers).toBeUndefined();
+    expect(r.issues.filter((i) => i.level === "warning")).toHaveLength(2);
   });
 
   it("flags missing required headers as a single error on row 1", () => {
@@ -261,5 +331,61 @@ describe("validateDataset", () => {
       aircraft: [ac],
     });
     expect(issues.some((i) => i.message.includes("Duplicate"))).toBe(true);
+  });
+
+  it("warns when passenger counts conflict with capacity or booked passengers", () => {
+    const issues = validateDataset({
+      schedule: [
+        {
+          ...flight,
+          seat_capacity: 180,
+          booked_passengers: 190,
+          connecting_passengers: 200,
+          vip_passengers: 191,
+          special_service_passengers: 192,
+        },
+      ],
+      aircraft: [ac],
+    });
+    expect(
+      issues.some((i) => i.message.includes("exceeds seat_capacity")),
+    ).toBe(true);
+    expect(
+      issues.filter((i) => i.message.includes("exceeds booked_passengers")),
+    ).toHaveLength(3);
+  });
+
+  it("warns when passenger counts imply a very different load factor", () => {
+    const issues = validateDataset({
+      schedule: [
+        {
+          ...flight,
+          seat_capacity: 200,
+          booked_passengers: 80,
+          load_factor: 0.9,
+        },
+      ],
+      aircraft: [ac],
+    });
+    expect(
+      issues.some((i) => i.message.includes("implies 40% load factor")),
+    ).toBe(true);
+  });
+
+  it("summarizes passenger coverage for import quality", () => {
+    const report = summarizeScheduleQuality([
+      {
+        ...flight,
+        seat_capacity: 200,
+        booked_passengers: 180,
+        connecting_passengers: 20,
+      },
+      { ...flight, flight_id: "FL002", flight_number: "VJ101" },
+    ]);
+    expect(report.flight_count).toBe(2);
+    expect(report.flights_with_any_passenger_data).toBe(1);
+    expect(report.flights_missing_passenger_data).toBe(1);
+    expect(report.using_load_factor_fallback).toBe(1);
+    expect(report.passenger_field_counts.booked_passengers).toBe(1);
   });
 });

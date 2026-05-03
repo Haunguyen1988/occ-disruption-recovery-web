@@ -3,7 +3,7 @@
 -- =============================================================================
 --
 -- Run after:
---   1. Applying migrations through 0003_approval_safety.sql
+--   1. Applying migrations through 0007_actual_times.sql
 --   2. Creating the 3 UAT auth users
 --   3. Running uat_seed.sql
 --
@@ -101,6 +101,66 @@ from (
       'EXECUTE'
     ),
     'Required for in-app approval'
+  union all
+  select
+    'flight passenger columns exist',
+    not exists (
+      select 1
+      from (
+        values
+          ('seat_capacity'),
+          ('booked_passengers'),
+          ('connecting_passengers'),
+          ('vip_passengers'),
+          ('special_service_passengers')
+      ) as required(column_name)
+      where not exists (
+        select 1
+        from information_schema.columns c
+        where c.table_schema = 'public'
+          and c.table_name = 'flights'
+          and c.column_name = required.column_name
+      )
+    ),
+    'Expected from 0005_passenger_fields.sql'
+  union all
+  select
+    'flight crew columns exist',
+    not exists (
+      select 1
+      from (
+        values
+          ('captain'),
+          ('first_officer')
+      ) as required(column_name)
+      where not exists (
+        select 1
+        from information_schema.columns c
+        where c.table_schema = 'public'
+          and c.table_name = 'flights'
+          and c.column_name = required.column_name
+      )
+    ),
+    'Expected from 0006_crew_fields.sql'
+  union all
+  select
+    'flight actual time columns exist',
+    not exists (
+      select 1
+      from (
+        values
+          ('actual_departure_time'),
+          ('actual_arrival_time')
+      ) as required(column_name)
+      where not exists (
+        select 1
+        from information_schema.columns c
+        where c.table_schema = 'public'
+          and c.table_name = 'flights'
+          and c.column_name = required.column_name
+      )
+    ),
+    'Expected from 0007_actual_times.sql'
   union all
   select
     'RLS enabled on flights',

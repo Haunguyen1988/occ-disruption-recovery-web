@@ -61,6 +61,25 @@ function validateCurfews(airportRules: RuleRecord): void {
   }
 }
 
+function validatePassengerRules(root: RuleRecord): void {
+  if (root.passenger_rules === undefined) return;
+  const passengerRules = requireObject(root, "passenger_rules");
+  requireBoolean(passengerRules, "enabled");
+  requireNumberRecord(passengerRules, "default_seat_capacity_by_type");
+  requireNumber(passengerRules, "fallback_seat_capacity");
+  requireNumber(passengerRules, "misconnect_delay_threshold_minutes");
+  requireNumber(passengerRules, "high_impact_passenger_threshold");
+  requireNumber(passengerRules, "international_priority_multiplier");
+  requireNumber(passengerRules, "last_flight_priority_multiplier");
+  requireNumber(passengerRules, "vip_priority_multiplier");
+  requireNumber(passengerRules, "special_service_priority_multiplier");
+}
+
+function requireOptionalNumber(parent: RuleRecord, key: string): void {
+  if (parent[key] === undefined) return;
+  requireNumber(parent, key);
+}
+
 function validateRules(value: unknown): void {
   const root = asRecord(value, "Rules YAML");
 
@@ -90,6 +109,8 @@ function validateRules(value: unknown): void {
   requireNumber(priorityRules, "high_load_factor_threshold");
   requireBoolean(priorityRules, "protect_international_flight");
 
+  validatePassengerRules(root);
+
   const spreadDelayRules = requireObject(root, "spread_delay_rules");
   requireBoolean(spreadDelayRules, "enabled");
   requireNumber(spreadDelayRules, "max_delay_per_flight_minutes");
@@ -107,6 +128,9 @@ function validateRules(value: unknown): void {
   requireNumber(scoreWeights, "closure_violation_penalty");
   requireNumber(scoreWeights, "curfew_risk_penalty");
   requireNumber(scoreWeights, "priority_protection_bonus");
+  requireOptionalNumber(scoreWeights, "passenger_delay_weight");
+  requireOptionalNumber(scoreWeights, "passenger_priority_weight");
+  requireOptionalNumber(scoreWeights, "misconnect_risk_penalty");
 }
 
 export const DEFAULT_RULES_YAML = `aircraft_rules:
@@ -143,6 +167,20 @@ priority_rules:
   high_load_factor_threshold: 0.85
   protect_international_flight: true
 
+passenger_rules:
+  enabled: true
+  default_seat_capacity_by_type:
+    A320: 180
+    A321: 230
+    A330: 377
+  fallback_seat_capacity: 180
+  misconnect_delay_threshold_minutes: 45
+  high_impact_passenger_threshold: 150
+  international_priority_multiplier: 1.3
+  last_flight_priority_multiplier: 1.4
+  vip_priority_multiplier: 4.0
+  special_service_priority_multiplier: 2.0
+
 spread_delay_rules:
   enabled: true
   max_delay_per_flight_minutes: 90
@@ -160,6 +198,9 @@ score_weights:
   closure_violation_penalty: 200
   curfew_risk_penalty: 120
   priority_protection_bonus: 40
+  passenger_delay_weight: 0.02
+  passenger_priority_weight: 15
+  misconnect_risk_penalty: 80
 `;
 
 export function getDefaultRules(): OccRules {

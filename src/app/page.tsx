@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { isAuthRequired } from "@/lib/supabase/server";
 
 export default function Home() {
+  const authRequired = isAuthRequired();
+  const primaryHref = authRequired ? "/login" : "/dashboard";
+  const primaryLabel = authRequired ? "Sign in" : "Open development dashboard";
+
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
       <div className="max-w-3xl w-full">
@@ -24,17 +29,19 @@ export default function Home() {
 
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
-            href="/dashboard"
+            href={primaryHref}
             className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-primary-foreground text-sm font-medium hover:opacity-90 transition"
           >
-            Open dashboard →
+            {primaryLabel}
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border px-6 text-sm font-medium hover:bg-muted transition"
-          >
-            Sign in
-          </Link>
+          {!authRequired && (
+            <Link
+              href="/login"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border px-6 text-sm font-medium hover:bg-muted transition"
+            >
+              Configure sign-in
+            </Link>
+          )}
         </div>
 
         <div className="mt-16 grid sm:grid-cols-2 gap-4 text-sm">

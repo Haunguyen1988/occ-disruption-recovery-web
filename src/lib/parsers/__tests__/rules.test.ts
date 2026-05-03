@@ -10,6 +10,8 @@ describe("business rules parser", () => {
     const rules = getDefaultRules();
     expect(rules.aircraft_rules.allow_same_fleet_swap).toBe(true);
     expect(rules.turnaround_rules.default_minutes).toBe(40);
+    expect(rules.passenger_rules?.enabled).toBe(true);
+    expect(rules.score_weights.passenger_delay_weight).toBe(0.02);
   });
 
   it("rejects malformed YAML", () => {

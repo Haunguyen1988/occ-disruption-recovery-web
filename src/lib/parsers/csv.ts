@@ -64,6 +64,28 @@ const DISRUPTION_REQUIRED = [
   "end_time",
 ] as const;
 
+const OPTIONAL_PASSENGER_FIELDS = [
+  "seat_capacity",
+  "booked_passengers",
+  "connecting_passengers",
+  "vip_passengers",
+  "special_service_passengers",
+] as const;
+
+type OptionalPassengerField = (typeof OPTIONAL_PASSENGER_FIELDS)[number];
+
+const OPTIONAL_CREW_FIELDS = ["captain", "first_officer"] as const;
+
+type OptionalCrewField = (typeof OPTIONAL_CREW_FIELDS)[number];
+
+export interface ScheduleQualityReport {
+  flight_count: number;
+  passenger_field_counts: Record<OptionalPassengerField, number>;
+  flights_with_any_passenger_data: number;
+  flights_missing_passenger_data: number;
+  using_load_factor_fallback: number;
+}
+
 // ---------------------------------------------------------------------------
 // Low-level parsing helpers
 // ---------------------------------------------------------------------------
@@ -137,6 +159,67 @@ function parseBool(value: unknown): boolean {
   return ["true", "1", "yes", "y"].includes(
     String(value).trim().toLowerCase(),
   );
+}
+
+function parseOptionalNonNegativeInteger(
+  row: Record<string, unknown>,
+  field: OptionalPassengerField,
+  rowNum: number,
+  issues: ValidationIssue[],
+): number | undefined {
+  const raw = row[field];
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    issues.push({
+      level: "warning",
+      message: `${field} is not a non-negative integer — ignoring value`,
+      row: rowNum,
+      column: field,
+      value: String(raw),
+      source: "schedule",
+    });
+    return undefined;
+  }
+  return n;
+}
+
+function parseOptionalPassengerFields(
+  row: Record<string, unknown>,
+  rowNum: number,
+  issues: ValidationIssue[],
+): Partial<Pick<FlightLeg, OptionalPassengerField>> {
+  const parsed: Partial<Pick<FlightLeg, OptionalPassengerField>> = {};
+  for (const field of OPTIONAL_PASSENGER_FIELDS) {
+    const value = parseOptionalNonNegativeInteger(row, field, rowNum, issues);
+    if (value !== undefined) parsed[field] = value;
+  }
+  return parsed;
+}
+
+function parseOptionalCrewFields(
+  row: Record<string, unknown>,
+): Partial<Pick<FlightLeg, OptionalCrewField>> {
+  const parsed: Partial<Pick<FlightLeg, OptionalCrewField>> = {};
+  for (const field of OPTIONAL_CREW_FIELDS) {
+    const raw = row[field];
+    const value = typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+    if (value) parsed[field] = value;
+  }
+  return parsed;
+}
+
+function parseOptionalActualTimes(
+  row: Record<string, unknown>,
+): Pick<FlightLeg, "actual_departure_time" | "actual_arrival_time"> {
+  return {
+    actual_departure_time: parseDateOrNull(
+      row.actual_departure_time ?? row.atd,
+    ) ?? undefined,
+    actual_arrival_time: parseDateOrNull(
+      row.actual_arrival_time ?? row.ata,
+    ) ?? undefined,
+  };
 }
 
 const IATA_RE = /^[A-Z]{3}$/;
@@ -361,6 +444,10 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
       });
     }
 
+    const passengerFields = parseOptionalPassengerFields(r, row, issues);
+    const crewFields = parseOptionalCrewFields(r);
+    const actualTimes = parseOptionalActualTimes(r);
+
     data.push({
       flight_id: String(r.flight_id),
       flight_number: String(r.flight_number ?? ""),
@@ -374,6 +461,9 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
       load_factor: Number.isFinite(loadFactor) ? loadFactor : 0,
       is_international: parseBool(r.is_international),
       is_last_flight_of_day: parseBool(r.is_last_flight_of_day),
+      ...passengerFields,
+      ...crewFields,
+      ...actualTimes,
     });
   });
   return { data, issues };
@@ -651,8 +741,91 @@ export function validateDataset(input: {
         source: "dataset",
       });
     }
+    if (
+      typeof f.seat_capacity === "number" &&
+      typeof f.booked_passengers === "number" &&
+      f.booked_passengers > f.seat_capacity
+    ) {
+      issues.push({
+        level: "warning",
+        message: `Flight ${f.flight_number}: booked_passengers ${f.booked_passengers} exceeds seat_capacity ${f.seat_capacity}`,
+        column: "booked_passengers",
+        value: String(f.booked_passengers),
+        source: "dataset",
+      });
+    }
+    if (
+      typeof f.seat_capacity === "number" &&
+      f.seat_capacity > 0 &&
+      typeof f.booked_passengers === "number" &&
+      f.load_factor >= 0 &&
+      f.load_factor <= 1
+    ) {
+      const inferredLoadFactor = f.booked_passengers / f.seat_capacity;
+      if (Math.abs(inferredLoadFactor - f.load_factor) > 0.15) {
+        issues.push({
+          level: "warning",
+          message: `Flight ${f.flight_number}: booked_passengers/seat_capacity implies ${(inferredLoadFactor * 100).toFixed(0)}% load factor, but load_factor is ${(f.load_factor * 100).toFixed(0)}%`,
+          column: "load_factor",
+          value: String(f.load_factor),
+          source: "dataset",
+        });
+      }
+    }
+    for (const [column, value] of [
+      ["connecting_passengers", f.connecting_passengers],
+      ["vip_passengers", f.vip_passengers],
+      ["special_service_passengers", f.special_service_passengers],
+    ] as const) {
+      if (
+        typeof value === "number" &&
+        typeof f.booked_passengers === "number" &&
+        value > f.booked_passengers
+      ) {
+        issues.push({
+          level: "warning",
+          message: `Flight ${f.flight_number}: ${column} ${value} exceeds booked_passengers ${f.booked_passengers}`,
+          column,
+          value: String(value),
+          source: "dataset",
+        });
+      }
+    }
   }
   return issues;
+}
+
+export function summarizeScheduleQuality(
+  schedule: FlightLeg[],
+): ScheduleQualityReport {
+  const passenger_field_counts: Record<OptionalPassengerField, number> = {
+    seat_capacity: 0,
+    booked_passengers: 0,
+    connecting_passengers: 0,
+    vip_passengers: 0,
+    special_service_passengers: 0,
+  };
+  let flightsWithAnyPassengerData = 0;
+
+  for (const f of schedule) {
+    let hasAnyPassengerData = false;
+    for (const field of OPTIONAL_PASSENGER_FIELDS) {
+      if (typeof f[field] === "number") {
+        passenger_field_counts[field] += 1;
+        hasAnyPassengerData = true;
+      }
+    }
+    if (hasAnyPassengerData) flightsWithAnyPassengerData += 1;
+  }
+
+  return {
+    flight_count: schedule.length,
+    passenger_field_counts,
+    flights_with_any_passenger_data: flightsWithAnyPassengerData,
+    flights_missing_passenger_data: schedule.length - flightsWithAnyPassengerData,
+    using_load_factor_fallback:
+      schedule.length - passenger_field_counts.booked_passengers,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -660,8 +833,8 @@ export function validateDataset(input: {
 // ---------------------------------------------------------------------------
 
 export const TEMPLATE_SCHEDULE_CSV =
-  "flight_id,flight_number,origin,destination,std,sta,aircraft_id,aircraft_type,priority_level,load_factor,is_international,is_last_flight_of_day\n" +
-  "FL001,VJ100,SGN,HAN,2026-04-28T07:00:00Z,2026-04-28T09:10:00Z,VJ-A321,A321,1,0.91,false,false\n";
+  "flight_id,flight_number,origin,destination,std,sta,aircraft_id,aircraft_type,priority_level,load_factor,is_international,is_last_flight_of_day,seat_capacity,booked_passengers,connecting_passengers,vip_passengers,special_service_passengers,captain,first_officer,actual_departure_time,actual_arrival_time\n" +
+  "FL001,VJ100,SGN,HAN,2026-04-28T07:00:00Z,2026-04-28T09:10:00Z,VJ-A321,A321,1,0.91,false,false,230,209,24,2,3,CAPT A,FO A,,\n";
 
 export const TEMPLATE_AIRCRAFT_CSV =
   "aircraft_id,aircraft_type,current_station,available_from,status,next_maintenance_time,restriction\n" +

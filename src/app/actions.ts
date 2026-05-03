@@ -69,6 +69,15 @@ export async function persistSchedule(
     load_factor: f.load_factor,
     is_international: f.is_international,
     is_last_flight_of_day: f.is_last_flight_of_day,
+    seat_capacity: f.seat_capacity ?? null,
+    booked_passengers: f.booked_passengers ?? null,
+    connecting_passengers: f.connecting_passengers ?? null,
+    vip_passengers: f.vip_passengers ?? null,
+    special_service_passengers: f.special_service_passengers ?? null,
+    captain: f.captain ?? null,
+    first_officer: f.first_officer ?? null,
+    actual_departure_time: f.actual_departure_time?.toISOString() ?? null,
+    actual_arrival_time: f.actual_arrival_time?.toISOString() ?? null,
   }));
   const { error } = await supabase
     .from("flights")

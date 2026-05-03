@@ -7,19 +7,38 @@ import {
   runSimulation,
   runMultiEventSimulation,
   type SimulationResult,
+  type TailAssignmentMode,
 } from "@/lib/engine";
 import type {
   DisruptionEvent,
   DisruptionType,
   FlightChange,
+  ImpactedFlight,
   OptionType,
   RecoveryOption,
   Severity,
   SimulationFeedback,
+  TailAssignmentOptimizationFeedback,
 } from "@/lib/types";
-import { getOptionWatchouts } from "@/lib/option-feedback";
+import {
+  getOptionWatchouts,
+  getTailRankingExplanations,
+} from "@/lib/option-feedback";
 import { cn, formatDateTime, formatOpsDateVn, vnLocalToUtc } from "@/lib/utils";
 import { approveOption, logExport, persistSimulation } from "@/app/actions";
+
+function randomWhatIfEventId(): string {
+  return `WHAT-IF-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+}
+
+const TAIL_ASSIGNMENT_MODES: {
+  value: TailAssignmentMode;
+  label: string;
+}[] = [
+  { value: "fast", label: "Fast" },
+  { value: "balanced", label: "Balanced" },
+  { value: "deep", label: "Deep" },
+];
 
 export default function SimulatePage() {
   const {
@@ -48,6 +67,8 @@ export default function SimulatePage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [tailAssignmentMode, setTailAssignmentMode] =
+    useState<TailAssignmentMode>("balanced");
 
   const hasData = schedule.length > 0 && aircraft.length > 0;
   const canRun = Boolean(hasData && disruption);
@@ -64,7 +85,13 @@ export default function SimulatePage() {
     try {
       const allEvents = [disruption, ...extraEvents];
       if (allEvents.length === 1) {
-        const r = runSimulation({ schedule, aircraft, disruption, rules });
+        const r = runSimulation({
+          schedule,
+          aircraft,
+          disruption,
+          rules,
+          tailAssignmentMode,
+        });
         setResult(r);
         setSelectedOption(r.ranked_options[0]?.option_id ?? null);
       } else {
@@ -73,6 +100,7 @@ export default function SimulatePage() {
           aircraft,
           disruptions: allEvents,
           rules,
+          tailAssignmentMode,
         });
         // Wrap multi result into SimulationResult shape so existing UI keeps
         // working — `event` becomes the primary disruption, but impacted +
@@ -93,7 +121,7 @@ export default function SimulatePage() {
   const addExtraEvent = () => {
     const ev = draftToEventSimple(eventDraft, opsDateStr);
     if (!ev) return;
-    ev.event_id = `WHAT-IF-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    ev.event_id = randomWhatIfEventId();
     setExtraEvents((prev) => [...prev, ev]);
     setEventDraft(emptyDraft());
     setShowEventForm(false);
@@ -428,6 +456,23 @@ export default function SimulatePage() {
             >
               Change event
             </button>
+            <div className="flex items-center gap-1 rounded-md border border-border p-1">
+              {TAIL_ASSIGNMENT_MODES.map((mode) => (
+                <button
+                  key={mode.value}
+                  onClick={() => setTailAssignmentMode(mode.value)}
+                  className={cn(
+                    "h-7 rounded px-2 text-xs font-medium",
+                    tailAssignmentMode === mode.value
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted",
+                  )}
+                  title={`Tail optimization: ${mode.label}`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleRun}
               disabled={!canRun || running}
@@ -501,12 +546,19 @@ export default function SimulatePage() {
           </div>
 
           <SwapFeedbackPanel feedback={result.feedback} />
+          <TailAssignmentFeedbackPanel
+            feedback={result.feedback?.tail_assignment ?? null}
+            options={result.ranked_options}
+          />
 
           <div className="rounded-lg border border-border">
             <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <h2 className="font-semibold">
                 Ranked recovery options ({result.ranked_options.length})
               </h2>
+              <span className="text-xs text-zinc-500 font-normal">
+                Total impacted: {result.impacted_flights.length} flights · {new Set(result.impacted_flights.map((f: ImpactedFlight) => f.flight.aircraft_id)).size} aircraft
+              </span>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-zinc-500">
                   Compare {compareIds.size}/2 selected
@@ -538,6 +590,7 @@ export default function SimulatePage() {
                 <OptionRow
                   key={opt.option_id}
                   option={opt}
+                  options={result.ranked_options}
                   active={selectedOption === opt.option_id}
                   inCompare={compareIds.has(opt.option_id)}
                   approved={approvedOptionId === opt.option_id}
@@ -553,6 +606,7 @@ export default function SimulatePage() {
               option={
                 result.ranked_options.find((o) => o.option_id === selectedOption)!
               }
+              options={result.ranked_options}
               eventInfo={
                 disruption ? formatDateTime(disruption.start_time) : ""
               }
@@ -577,6 +631,7 @@ const OPTION_COLORS: Record<OptionType, string> = {
   DEEP_DELAY: "bg-red-700",
   SINGLE_SWAP: "bg-emerald-600",
   SWAP_CHAIN: "bg-teal-600",
+  TAIL_ASSIGNMENT_OPTIMIZED: "bg-sky-700",
   CANCEL_OR_FERRY: "bg-zinc-700",
 };
 
@@ -617,6 +672,18 @@ function parseSwapChainInfo(option: RecoveryOption) {
   const displacedDelayed = displacedCoverage.filter(
     (fc) => fc.new_aircraft === fc.original_aircraft && fc.delay_minutes > 0,
   );
+  const chainFlightIds = new Set(
+    [...primarySwaps, ...displacedCoverage].map((fc) => fc.flight_id),
+  );
+  const otherAffectedFlights = option.flight_changes.filter(
+    (fc) => !chainFlightIds.has(fc.flight_id),
+  );
+  const otherAffectedDelayed = otherAffectedFlights.filter(
+    (fc) => fc.delay_minutes > 0,
+  );
+  const otherAffectedNoChange = otherAffectedFlights.filter(
+    (fc) => fc.delay_minutes === 0 && fc.new_aircraft === fc.original_aircraft,
+  );
 
   return {
     chainNodes,
@@ -626,11 +693,15 @@ function parseSwapChainInfo(option: RecoveryOption) {
     displacedCoverage,
     displacedWithCoverage,
     displacedDelayed,
+    otherAffectedFlights,
+    otherAffectedDelayed,
+    otherAffectedNoChange,
   };
 }
 
 function OptionRow({
   option,
+  options,
   active,
   inCompare,
   approved,
@@ -638,6 +709,7 @@ function OptionRow({
   onToggleCompare,
 }: {
   option: RecoveryOption;
+  options: RecoveryOption[];
   active: boolean;
   inCompare: boolean;
   approved: boolean;
@@ -645,6 +717,7 @@ function OptionRow({
   onToggleCompare: () => void;
 }) {
   const watchouts = getOptionWatchouts(option);
+  const rankingExplanations = getTailRankingExplanations(option, options);
 
   return (
     <div
@@ -672,7 +745,7 @@ function OptionRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
               className={cn(
-                "inline-block px-2 py-0.5 rounded text-[11px] font-mono text-white",
+                "inline-block max-w-full break-all px-2 py-0.5 rounded text-[11px] font-mono text-white",
                 OPTION_COLORS[option.option_type],
               )}
             >
@@ -733,10 +806,23 @@ function OptionRow({
           </div>
         </div>
         <div className="col-span-2">
-          <div className="text-xs text-zinc-500">Impact / Swap</div>
+          <div className="text-xs text-zinc-500">Coverage / Swap</div>
           <div className="text-sm font-mono">
-            {option.impacted_flight_count} / {option.swap_count}
+            {option.impacted_flight_count} flights · {option.swap_count} swap
           </div>
+          {option.passenger_impact && (
+            <div
+              className={cn(
+                "mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-mono",
+                option.passenger_impact.high_impact
+                  ? "bg-red-100 text-red-800"
+                  : "bg-sky-100 text-sky-800",
+              )}
+              title={`${option.passenger_impact.passenger_delay_minutes} passenger-delay minutes`}
+            >
+              ~{option.passenger_impact.estimated_affected_passengers} pax
+            </div>
+          )}
         </div>
         <div className="col-span-2">
           <span
@@ -758,6 +844,14 @@ function OptionRow({
               className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-300"
             >
               {watchout}
+            </div>
+          ))}
+          {rankingExplanations.slice(0, 1).map((explanation, index) => (
+            <div
+              key={`${option.option_id}-ranking-${index}`}
+              className="mt-1 text-[11px] font-medium text-sky-700 dark:text-sky-300"
+            >
+              {explanation}
             </div>
           ))}
         </div>
@@ -856,20 +950,167 @@ function SwapFeedbackPanel({
   );
 }
 
+function TailAssignmentFeedbackPanel({
+  feedback,
+  options,
+}: {
+  feedback: TailAssignmentOptimizationFeedback | null;
+  options: RecoveryOption[];
+}) {
+  if (!feedback?.attempted) {
+    return null;
+  }
+
+  const bestTailOption = options.find(
+    (option) => option.option_type === "TAIL_ASSIGNMENT_OPTIMIZED",
+  );
+  const pathText = feedback.connection_fixing_applied
+    ? `${feedback.initial_path_count.toLocaleString()} -> ${feedback.final_path_count.toLocaleString()}`
+    : feedback.path_count.toLocaleString();
+  const searchText = feedback.connection_fixing_applied
+    ? `${feedback.initial_search_nodes.toLocaleString()} -> ${feedback.final_search_nodes.toLocaleString()}`
+    : feedback.search_nodes.toLocaleString();
+
+  return (
+    <div className="rounded-lg border border-sky-300 bg-sky-50/70 p-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold">Aircraft recovery optimization</h2>
+          <p className="mt-1 text-sm text-zinc-700">
+            Recovery horizon has{" "}
+            <span className="font-mono">
+              {feedback.horizon_flight_count.toLocaleString()}
+            </span>{" "}
+            flight(s) across{" "}
+            <span className="font-mono">
+              {feedback.aircraft_count.toLocaleString()}
+            </span>{" "}
+            aircraft.
+          </p>
+        </div>
+        <div className="text-sm font-medium">
+          <div>
+            {bestTailOption
+              ? `Best optimized option #${bestTailOption.rank ?? "-"}`
+              : "No optimized option generated"}
+          </div>
+          <div className="mt-1 text-right text-xs font-mono uppercase text-zinc-500">
+            {feedback.mode}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <OptimizerMetric
+          label="Arc reduction"
+          value={`${feedback.original_arc_count.toLocaleString()} -> ${feedback.reduced_arc_count.toLocaleString()}`}
+          detail={`${feedback.removed_arc_count.toLocaleString()} removed (${feedback.arc_reduction_pct}%)`}
+        />
+        <OptimizerMetric
+          label="Candidate paths"
+          value={pathText}
+          detail={
+            feedback.connection_fixing_applied
+              ? "after connection fixing"
+              : "before master selection"
+          }
+        />
+        <OptimizerMetric
+          label="Master search"
+          value={searchText}
+          detail="visited node(s)"
+        />
+        <OptimizerMetric
+          label="Connection fixing"
+          value={
+            feedback.connection_fixing_applied
+              ? `${feedback.fixed_connection_count.toLocaleString()} locked`
+              : "Not applied"
+          }
+          detail={`${feedback.option_count.toLocaleString()} optimized option(s)`}
+        />
+      </div>
+
+      {!bestTailOption && feedback.no_option_reason && (
+        <div className="mt-3 rounded border border-sky-200 bg-background/80 p-3 text-sm">
+          <div className="font-medium text-zinc-900 dark:text-zinc-100">
+            {feedback.no_option_reason}
+          </div>
+          <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            Candidate paths can cover up to{" "}
+            <span className="font-mono">
+              {feedback.best_covered_flight_count.toLocaleString()}
+            </span>{" "}
+            of{" "}
+            <span className="font-mono">
+              {feedback.required_flight_count.toLocaleString()}
+            </span>{" "}
+            required horizon flight(s); complete solutions found:{" "}
+            <span className="font-mono">
+              {feedback.complete_solution_count.toLocaleString()}
+            </span>
+            .
+          </div>
+          {feedback.top_blocking_reasons.length > 0 && (
+            <ul className="mt-2 grid gap-1 text-xs text-zinc-700 dark:text-zinc-200 sm:grid-cols-2">
+              {feedback.top_blocking_reasons.map((item) => (
+                <li
+                  key={item.reason}
+                  className="flex items-start justify-between gap-3 rounded border border-border/70 px-2 py-1"
+                >
+                  <span>{item.reason}</span>
+                  <span className="font-mono text-zinc-500">
+                    {item.count.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OptimizerMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded border border-sky-200 bg-background/70 p-3">
+      <div className="text-xs text-zinc-500">{label}</div>
+      <div className="mt-1 break-words font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        {value}
+      </div>
+      <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+        {detail}
+      </div>
+    </div>
+  );
+}
+
 function OptionDetail({
   option,
+  options,
   eventInfo,
   onApprove,
   approved,
   canApprove,
 }: {
   option: RecoveryOption;
+  options: RecoveryOption[];
   eventInfo: string;
   onApprove?: () => void;
   approved: boolean;
   canApprove: boolean;
 }) {
   const watchouts = getOptionWatchouts(option);
+  const rankingExplanations = getTailRankingExplanations(option, options);
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-4">
@@ -883,6 +1124,20 @@ function OptionDetail({
       </div>
 
       <div>
+        {rankingExplanations.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2">
+              Ranking explanation
+            </h3>
+            <ul className="text-sm space-y-1 list-disc list-inside text-sky-800 dark:text-sky-200">
+              {rankingExplanations.map((explanation, index) => (
+                <li key={`${option.option_id}-ranking-detail-${index}`}>
+                  {explanation}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {watchouts.length > 0 && (
           <div className="mb-4">
             <h3 className="text-sm font-semibold mb-2">Watchouts</h3>
@@ -903,6 +1158,8 @@ function OptionDetail({
         </ul>
       </div>
 
+      {option.passenger_impact && <PassengerImpactPanel option={option} />}
+
       <div>
         <h3 className="text-sm font-semibold mb-2">Score breakdown</h3>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
@@ -918,7 +1175,7 @@ function OptionDetail({
       {option.flight_changes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold mb-2">
-            Flight changes ({option.flight_changes.length})
+            Flight impact plan ({option.flight_changes.length})
           </h3>
 
           {/* SWAP_CHAIN: chain flow diagram + grouped tables */}
@@ -990,6 +1247,11 @@ function OptionDetail({
                         ⏱ {chain.displacedDelayed.length} displaced delayed
                       </span>
                     )}
+                    {chain.otherAffectedFlights.length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-sky-300 bg-sky-50 dark:bg-sky-900/30 px-2 py-0.5 text-sky-700 dark:text-sky-300 font-medium">
+                        {chain.otherAffectedFlights.length} other affected
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1016,6 +1278,24 @@ function OptionDetail({
                       </span>
                     </h4>
                     <FlightChangesTable changes={chain.displacedCoverage} highlightDisplaced />
+                  </div>
+                )}
+
+                {/* Group 3: Other impacted flights covered by this plan */}
+                {chain.otherAffectedFlights.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold mb-1.5 flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-sky-500" />
+                      Other affected flights ({chain.otherAffectedFlights.length} flights)
+                      <span className="font-normal text-zinc-500">
+                        {chain.otherAffectedDelayed.length} delayed,{" "}
+                        {chain.otherAffectedNoChange.length} no aircraft/time change
+                      </span>
+                    </h4>
+                    <FlightChangesTable
+                      changes={chain.otherAffectedFlights}
+                      highlightAffected
+                    />
                   </div>
                 )}
               </div>
@@ -1068,9 +1348,11 @@ function OptionDetail({
 function FlightChangesTable({
   changes,
   highlightDisplaced,
+  highlightAffected,
 }: {
   changes: FlightChange[];
   highlightDisplaced?: boolean;
+  highlightAffected?: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -1098,6 +1380,8 @@ function FlightChangesTable({
                   "border-b border-border/50 last:border-b-0",
                   highlightDisplaced && isSwapped && "bg-violet-50/50 dark:bg-violet-900/10",
                   highlightDisplaced && isDelayed && !isSwapped && "bg-amber-50/50 dark:bg-amber-900/10",
+                  highlightAffected && isDelayed && "bg-amber-50/50 dark:bg-amber-900/10",
+                  highlightAffected && !isDelayed && !isSwapped && "bg-sky-50/40 dark:bg-sky-900/10",
                 )}
               >
                 <td className="py-1.5 pr-3">{c.flight_number}</td>
@@ -1134,6 +1418,91 @@ function FlightChangesTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function PassengerImpactPanel({ option }: { option: RecoveryOption }) {
+  const impact = option.passenger_impact;
+  if (!impact) return null;
+
+  return (
+    <div className="rounded border border-sky-200 bg-sky-50 p-4 dark:bg-sky-950/30 dark:border-sky-800">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+            Passenger impact
+          </h3>
+          <p className="mt-1 text-xs text-sky-800 dark:text-sky-200">
+            Estimated from booked passengers when available, otherwise seat
+            capacity and load factor.
+          </p>
+        </div>
+        {impact.high_impact && (
+          <span className="rounded bg-red-100 px-2 py-1 text-[11px] font-mono text-red-800">
+            HIGH IMPACT
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <PassengerMetric
+          label="Affected pax"
+          value={`~${impact.estimated_affected_passengers}`}
+        />
+        <PassengerMetric
+          label="Pax-delay min"
+          value={String(impact.passenger_delay_minutes)}
+        />
+        <PassengerMetric
+          label="Misconnect risk"
+          value={`~${impact.misconnect_risk_passengers}`}
+        />
+        <PassengerMetric
+          label="Priority score"
+          value={String(impact.priority_passenger_score)}
+        />
+      </div>
+
+      {impact.top_impacted_flights.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold text-sky-900 dark:text-sky-100">
+            Top passenger-impact flights
+          </div>
+          <div className="mt-2 divide-y divide-sky-200 rounded border border-sky-200 bg-background/70 dark:divide-sky-800 dark:border-sky-800">
+            {impact.top_impacted_flights.map((flight) => (
+              <div
+                key={flight.flight_id}
+                className="grid gap-2 p-2 text-xs sm:grid-cols-4"
+              >
+                <div className="font-mono font-semibold">
+                  {flight.flight_number}
+                </div>
+                <div>~{flight.affected_passengers} pax</div>
+                <div>{flight.passenger_delay_minutes} pax-min</div>
+                <div className="text-zinc-600 dark:text-zinc-300">
+                  {flight.reason_codes.slice(0, 2).join("; ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PassengerMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded border border-sky-200 bg-background/80 p-2 dark:border-sky-800">
+      <div className="text-zinc-500">{label}</div>
+      <div className="mt-1 font-mono font-semibold">{value}</div>
     </div>
   );
 }

@@ -27,6 +27,20 @@ priority_rules:
   high_load_factor_threshold: 0.85
   protect_international_flight: true
 
+passenger_rules:
+  enabled: true
+  default_seat_capacity_by_type:
+    A320: 180
+    A321: 230
+    A330: 377
+  fallback_seat_capacity: 180
+  misconnect_delay_threshold_minutes: 45
+  high_impact_passenger_threshold: 150
+  international_priority_multiplier: 1.3
+  last_flight_priority_multiplier: 1.4
+  vip_priority_multiplier: 4.0
+  special_service_priority_multiplier: 2.0
+
 spread_delay_rules:
   enabled: true
   max_delay_per_flight_minutes: 90
@@ -44,3 +58,6 @@ score_weights:
   closure_violation_penalty: 200
   curfew_risk_penalty: 120
   priority_protection_bonus: 40
+  passenger_delay_weight: 0.02
+  passenger_priority_weight: 15
+  misconnect_risk_penalty: 80
