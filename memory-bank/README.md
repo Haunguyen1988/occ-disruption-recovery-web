@@ -1,6 +1,6 @@
 # Memory Bank
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 This folder is the project handoff state for future Codex sessions. Start here before changing code.
 
@@ -23,6 +23,7 @@ Latest release-gate recheck on 2026-05-03:
 - S8 benchmark result: `UAT-TAIL-001`, balanced mode, 5 flights, 3 aircraft, 1 impacted flight, 7 ranked options, 19 ms runtime, tail rank #1, tail score 2387, best non-tail rank #3, best non-tail score 23215, score delta -20828, 35 -> 9 arcs, 15 paths, 42 search nodes, 1 fixed connection.
 - Before the final pass, a stale `DEEP_DELAY` upgrade-verification assertion was fixed. `DEEP_DELAY` now marks the selected low-priority flight while still carrying the full flight impact plan.
 - Production readiness docs now use the current passenger-scored S8 benchmark values, and the release-notes template captures the full optimizer diagnostics printed by the benchmark.
+- Upload/simulate recheck on 2026-05-04: CSV/XLSX upload now normalizes common exported headers such as `Flight ID`, trims/BOM-strips columns, and `/dashboard/simulate` surfaces parser/cross-dataset issues and blocks simulation while import errors remain. Verification: `npm.cmd run lint` passed, targeted CSV parser test passed with escalation after sandbox `spawn EPERM`, and `npm.cmd run build` passed with escalation after sandbox `.next` unlink `EPERM`.
 
 Earlier commands run on 2026-05-02 after the tail-assignment ranking explanation and S8 UAT-doc alignment pass:
 

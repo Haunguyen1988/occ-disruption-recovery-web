@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useData } from "@/components/data-context";
 import { GanttSchedule } from "@/components/gantt-schedule";
+import { ScheduleDateFilterSelect } from "@/components/schedule-date-selection";
 import {
   analyzeMultiEventConflicts,
   applyRecoveryObjectiveProfile,
@@ -57,10 +58,14 @@ export default function SimulatePage() {
     setDisruption,
     loadScheduleFile,
     loadAircraftFile,
+    loadDisruptionFile,
+    loadSampleData,
+    validation,
+    parseIssues,
+    scheduleDateFilter,
+    setScheduleOperatingDate,
     reset,
   } = useData();
-  const schedRef = useRef<HTMLInputElement>(null);
-  const acRef = useRef<HTMLInputElement>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [extraEvents, setExtraEvents] = useState<DisruptionEvent[]>([]);
@@ -74,6 +79,9 @@ export default function SimulatePage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [sampleLoading, setSampleLoading] = useState<
+    null | "aog" | "airport_close" | "weather" | "late_arrival"
+  >(null);
   const [tailAssignmentMode, setTailAssignmentMode] =
     useState<TailAssignmentMode>("balanced");
   const [objectiveProfile, setObjectiveProfile] =
@@ -82,7 +90,15 @@ export default function SimulatePage() {
     useState<RecoveryObjectiveProfile>("balanced");
 
   const hasData = schedule.length > 0 && aircraft.length > 0;
-  const canRun = Boolean(hasData && disruption);
+  const parseErrors = [
+    ...parseIssues.schedule,
+    ...parseIssues.aircraft,
+    ...parseIssues.disruption,
+  ].filter((issue) => issue.level === "error");
+  const validationErrors = validation.filter((issue) => issue.level === "error");
+  const canRun = Boolean(
+    hasData && disruption && parseErrors.length === 0 && validationErrors.length === 0,
+  );
   const canWrite = session?.role === "controller" || session?.role === "admin";
   const objectiveRules = useMemo(
     () => applyRecoveryObjectiveProfile(rules, objectiveProfile),
@@ -278,6 +294,8 @@ export default function SimulatePage() {
     setUploadErr(null);
     try {
       await loadScheduleFile(f);
+      setResult(null);
+      setSelectedOption(null);
     } catch (e) {
       setUploadErr(`Schedule: ${(e as Error).message}`);
     }
@@ -287,8 +305,52 @@ export default function SimulatePage() {
     setUploadErr(null);
     try {
       await loadAircraftFile(f);
+      setResult(null);
+      setSelectedOption(null);
     } catch (e) {
       setUploadErr(`Aircraft: ${(e as Error).message}`);
+    }
+  };
+
+  const handleUploadDisruption = async (f: File) => {
+    setUploadErr(null);
+    try {
+      await loadDisruptionFile(f);
+      setResult(null);
+      setSelectedOption(null);
+      setExtraEvents([]);
+    } catch (e) {
+      setUploadErr(`Disruption: ${(e as Error).message}`);
+    }
+  };
+
+  const handleScheduleDateChange = async (date: string | null) => {
+    setUploadErr(null);
+    try {
+      await setScheduleOperatingDate(date);
+      setResult(null);
+      setSelectedOption(null);
+    } catch (e) {
+      setUploadErr(`Schedule date filter: ${(e as Error).message}`);
+    }
+  };
+
+  const handleLoadSample = async (
+    scenario: "aog" | "airport_close" | "weather" | "late_arrival",
+  ) => {
+    setUploadErr(null);
+    setResult(null);
+    setSelectedOption(null);
+    setSavedUuid(null);
+    setApprovedOptionId(null);
+    setExtraEvents([]);
+    setSampleLoading(scenario);
+    try {
+      await loadSampleData(scenario);
+    } catch (e) {
+      setUploadErr(`Sample data: ${(e as Error).message}`);
+    } finally {
+      setSampleLoading(null);
     }
   };
 
@@ -330,26 +392,40 @@ export default function SimulatePage() {
             {uploadErr}
           </div>
         )}
+        <ImportIssueSummary
+          parseIssues={parseIssues}
+          validationIssues={validation}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
-          <input ref={schedRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+          <input id="simulate-schedule-upload" type="file" accept=".csv,.xlsx,.xls" className="sr-only"
             onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleUploadSchedule(f); if (e.target) e.target.value = ""; }}
           />
-          <input ref={acRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+          <input id="simulate-aircraft-upload" type="file" accept=".csv,.xlsx,.xls" className="sr-only"
             onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleUploadAircraft(f); if (e.target) e.target.value = ""; }}
           />
-          <button
-            onClick={() => schedRef.current?.click()}
-            className="h-9 rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+          <input id="simulate-disruption-upload" type="file" accept=".csv,.xlsx,.xls" className="sr-only"
+            onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleUploadDisruption(f); if (e.target) e.target.value = ""; }}
+          />
+          <label
+            htmlFor="simulate-schedule-upload"
+            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
           >
-            📋 Upload Schedule {schedule.length > 0 && `(${schedule.length})`}
-          </button>
-          <button
-            onClick={() => acRef.current?.click()}
-            className="h-9 rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+            📋 Upload Schedule{" "}
+            {schedule.length > 0 && `(${schedule.length})`}
+          </label>
+          <label
+            htmlFor="simulate-aircraft-upload"
+            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
           >
             ✈️ Upload Aircraft {aircraft.length > 0 && `(${aircraft.length})`}
-          </button>
+          </label>
+          <label
+            htmlFor="simulate-disruption-upload"
+            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+          >
+            Upload Disruption {disruption && "(1)"}
+          </label>
           {hasData && (
             <span className="text-xs text-emerald-600 font-medium">
               ✅ {schedule.length} flights · {aircraft.length} aircraft ·
@@ -365,6 +441,42 @@ export default function SimulatePage() {
             </span>
           )}
         </div>
+        {!hasData && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="text-xs font-medium text-zinc-500">
+              Quick sample
+            </span>
+            {[
+              ["aog", "AOG"],
+              ["airport_close", "Airport close"],
+              ["weather", "Weather"],
+              ["late_arrival", "Late arrival"],
+            ].map(([scenario, label]) => (
+              <button
+                key={scenario}
+                onClick={() =>
+                  handleLoadSample(
+                    scenario as
+                      | "aog"
+                      | "airport_close"
+                      | "weather"
+                      | "late_arrival",
+                  )
+                }
+                disabled={sampleLoading !== null}
+                className="h-8 rounded-md border border-border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+              >
+                {sampleLoading === scenario ? "Loading..." : label}
+              </button>
+            ))}
+          </div>
+        )}
+        {scheduleDateFilter && (
+          <ScheduleDateFilterSelect
+            filter={scheduleDateFilter}
+            onChange={handleScheduleDateChange}
+          />
+        )}
       </div>
 
       {/* ── Primary event creation (simplified form) ─────── */}
@@ -589,6 +701,13 @@ export default function SimulatePage() {
               />
             </div>
             <ul className="mt-3 text-sm space-y-1">
+              {result.impacted_flights.length === 0 && (
+                <li className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  No flights matched this disruption window, aircraft, airport,
+                  or current operating-date filter. Change the event time/date
+                  or select the schedule date that contains the affected flight.
+                </li>
+              )}
               {result.impacted_flights.map((f) => (
                 <li
                   key={f.flight.flight_id}
@@ -645,6 +764,14 @@ export default function SimulatePage() {
               </div>
             </div>
             <div className="divide-y divide-border">
+              {result.ranked_options.length === 0 && (
+                <div className="p-4 text-sm text-zinc-600">
+                  No recovery options were generated for this run.
+                  {result.impacted_flights.length === 0
+                    ? " The event did not impact any loaded flights."
+                    : " The engine found impacted flights, but no feasible recovery plan passed the current constraints."}
+                </div>
+              )}
               {result.ranked_options.map((opt) => (
                 <OptionRow
                   key={opt.option_id}
@@ -1562,6 +1689,60 @@ function PassengerMetric({
     <div className="rounded border border-sky-200 bg-background/80 p-2 dark:border-sky-800">
       <div className="text-zinc-500">{label}</div>
       <div className="mt-1 font-mono font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function ImportIssueSummary({
+  parseIssues,
+  validationIssues,
+}: {
+  parseIssues: ReturnType<typeof useData>["parseIssues"];
+  validationIssues: ReturnType<typeof useData>["validation"];
+}) {
+  const grouped = [
+    ["Schedule", parseIssues.schedule],
+    ["Aircraft", parseIssues.aircraft],
+    ["Disruption", parseIssues.disruption],
+    ["Dataset", validationIssues],
+  ] as const;
+  const visibleGroups = grouped
+    .map(([label, issues]) => ({
+      label,
+      errors: issues.filter((issue) => issue.level === "error"),
+      warnings: issues.filter((issue) => issue.level === "warning"),
+    }))
+    .filter((group) => group.errors.length > 0 || group.warnings.length > 0);
+
+  if (visibleGroups.length === 0) return null;
+
+  return (
+    <div className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+      <div className="font-semibold">
+        Import checks found issues. Errors must be fixed before simulation.
+      </div>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {visibleGroups.map((group) => (
+          <div key={group.label} className="rounded border border-amber-200 bg-background/70 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">{group.label}</span>
+              <span className="font-mono text-[11px]">
+                {group.errors.length} error / {group.warnings.length} warn
+              </span>
+            </div>
+            <ul className="mt-1 space-y-1 font-mono text-[11px]">
+              {[...group.errors, ...group.warnings].slice(0, 4).map((issue, index) => (
+                <li key={`${group.label}-${index}`} className="flex flex-wrap gap-1">
+                  <span className="uppercase">{issue.level}</span>
+                  {issue.row != null && <span>row {issue.row}</span>}
+                  {issue.column && <span>col {issue.column}</span>}
+                  <span className="font-sans">{issue.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -5,18 +5,28 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
+  detectScheduleRowDates,
+  filterScheduleRowsByDate,
   parseAircraftRows,
   parseCsvOrXlsx,
   parseDisruptionRows,
   parseScheduleRows,
   validateDataset,
+  type ImportDateCandidate,
+  type ParsedRows,
   type ValidationIssue,
 } from "@/lib/parsers/csv";
-import { tryParseAimsWorkbook } from "@/lib/parsers/aims";
+import {
+  detectAimsDayRepDates,
+  filterAimsDayRepByDate,
+  parseAimsDayRep,
+  tryReadAimsWorkbookMatrix,
+} from "@/lib/parsers/aims";
 import {
   DEFAULT_RULES_YAML,
   getDefaultRules,
@@ -47,6 +57,7 @@ interface DataState {
     disruption: ValidationIssue[];
   };
   detectedFormat: "aims_dayrep" | null;
+  scheduleDateFilter: ScheduleDateFilterSummary | null;
   isLoaded: boolean;
   session: SessionInfo | null;
   operationalLoadError: OperationalLoadError | null;
@@ -54,6 +65,7 @@ interface DataState {
 
 interface DataActions {
   loadScheduleFile: (file: File) => Promise<void>;
+  setScheduleOperatingDate: (selectedDate: string | null) => Promise<void>;
   loadAircraftFile: (file: File) => Promise<void>;
   loadDisruptionFile: (file: File) => Promise<void>;
   setDisruption: (e: DisruptionEvent | null) => void;
@@ -67,6 +79,23 @@ interface DataActions {
   ) => Promise<void>;
   reset: () => void;
 }
+
+export interface ScheduleDateFilterSummary {
+  fileName: string;
+  detectedFormat: "aims_dayrep" | "schedule";
+  candidates: ImportDateCandidate[];
+  selectedDate: string | null;
+}
+
+type ScheduleImportSource =
+  | {
+      kind: "aims_dayrep";
+      matrix: unknown[][];
+    }
+  | {
+      kind: "schedule";
+      rows: ParsedRows;
+    };
 
 const Ctx = createContext<(DataState & DataActions) | null>(null);
 
@@ -112,6 +141,9 @@ export function DataProvider({
   const [detectedFormat, setDetectedFormat] = useState<
     DataState["detectedFormat"]
   >(null);
+  const scheduleImportSource = useRef<ScheduleImportSource | null>(null);
+  const [scheduleDateFilter, setScheduleDateFilter] =
+    useState<ScheduleDateFilterSummary | null>(null);
   const seededFromServer = Boolean(
     initialSchedule?.length || initialAircraft?.length || initialDisruption,
   );
@@ -140,25 +172,94 @@ export function DataProvider({
     [schedule, aircraft],
   );
 
-  const loadScheduleFile = useCallback(async (file: File) => {
-    const aims = await tryParseAimsWorkbook(file);
-    if (aims) {
-      setSchedule(aims.schedule);
-      setAircraft(aims.aircraft);
-      setDetectedFormat(aims.detectedFormat);
-      setParseIssues((p) => ({
-        ...p,
-        schedule: aims.issues,
-        aircraft: [],
-      }));
-      return;
-    }
-    const rows = await parseCsvOrXlsx(file);
+  const applyAimsScheduleMatrix = useCallback((matrix: unknown[][]) => {
+    const aims = parseAimsDayRep(matrix);
+    setSchedule(aims.schedule);
+    setAircraft(aims.aircraft);
+    setDetectedFormat(aims.detectedFormat);
+    setParseIssues((p) => ({
+      ...p,
+      schedule: aims.issues,
+      aircraft: [],
+    }));
+    setIsLoaded(true);
+  }, []);
+
+  const applyScheduleRows = useCallback((rows: ParsedRows) => {
     const { data, issues } = parseScheduleRows(rows);
     setSchedule(data);
     setDetectedFormat(null);
     setParseIssues((p) => ({ ...p, schedule: issues }));
+    setIsLoaded(true);
   }, []);
+
+  const loadScheduleFile = useCallback(
+    async (file: File) => {
+      const fileName = file.name || "uploaded schedule";
+      scheduleImportSource.current = null;
+      setScheduleDateFilter(null);
+
+      const aimsMatrix = await tryReadAimsWorkbookMatrix(file);
+      if (aimsMatrix) {
+        const candidates = detectAimsDayRepDates(aimsMatrix);
+        scheduleImportSource.current = {
+          kind: "aims_dayrep",
+          matrix: aimsMatrix,
+        };
+        applyAimsScheduleMatrix(aimsMatrix);
+        if (candidates.length > 1) {
+          setScheduleDateFilter({
+            fileName,
+            detectedFormat: "aims_dayrep",
+            candidates,
+            selectedDate: null,
+          });
+        }
+        return;
+      }
+
+      const rows = await parseCsvOrXlsx(file);
+      const candidates = detectScheduleRowDates(rows);
+      scheduleImportSource.current = {
+        kind: "schedule",
+        rows,
+      };
+      applyScheduleRows(rows);
+      if (candidates.length > 1) {
+        setScheduleDateFilter({
+          fileName,
+          detectedFormat: "schedule",
+          candidates,
+          selectedDate: null,
+        });
+      }
+    },
+    [applyAimsScheduleMatrix, applyScheduleRows],
+  );
+
+  const setScheduleOperatingDate = useCallback(
+    async (selectedDate: string | null) => {
+      const source = scheduleImportSource.current;
+      if (!source) return;
+      if (source.kind === "aims_dayrep") {
+        applyAimsScheduleMatrix(
+          selectedDate
+            ? filterAimsDayRepByDate(source.matrix, selectedDate)
+            : source.matrix,
+        );
+      } else {
+        applyScheduleRows(
+          selectedDate
+            ? filterScheduleRowsByDate(source.rows, selectedDate)
+            : source.rows,
+        );
+      }
+      setScheduleDateFilter((current) =>
+        current ? { ...current, selectedDate } : current,
+      );
+    },
+    [applyAimsScheduleMatrix, applyScheduleRows],
+  );
 
   const loadAircraftFile = useCallback(async (file: File) => {
     const rows = await parseCsvOrXlsx(file);
@@ -192,6 +293,8 @@ export function DataProvider({
       const sched = parseScheduleRows(s);
       const ac = parseAircraftRows(a);
       const dis = parseDisruptionRows(d);
+      scheduleImportSource.current = null;
+      setScheduleDateFilter(null);
       setSchedule(sched.data);
       setAircraft(ac.data);
       setDisruption(dis.data[0] ?? null);
@@ -206,6 +309,8 @@ export function DataProvider({
   );
 
   const reset = useCallback(() => {
+    scheduleImportSource.current = null;
+    setScheduleDateFilter(null);
     setSchedule([]);
     setAircraft([]);
     setDisruption(null);
@@ -229,10 +334,12 @@ export function DataProvider({
       validation,
       parseIssues,
       detectedFormat,
+      scheduleDateFilter,
       isLoaded,
       session,
       operationalLoadError,
       loadScheduleFile,
+      setScheduleOperatingDate,
       loadAircraftFile,
       loadDisruptionFile,
       setDisruption,
@@ -250,10 +357,12 @@ export function DataProvider({
       validation,
       parseIssues,
       detectedFormat,
+      scheduleDateFilter,
       isLoaded,
       session,
       operationalLoadError,
       loadScheduleFile,
+      setScheduleOperatingDate,
       loadAircraftFile,
       loadDisruptionFile,
       loadSampleData,

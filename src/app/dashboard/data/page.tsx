@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useData } from "@/components/data-context";
+import { ScheduleDateFilterSelect } from "@/components/schedule-date-selection";
 import { cn, formatAirportLocal, formatDateTime } from "@/lib/utils";
 import {
   persistAircraft,
@@ -30,6 +31,8 @@ export default function DataPage() {
     validation,
     parseIssues,
     detectedFormat,
+    scheduleDateFilter,
+    setScheduleOperatingDate,
     session,
   } = useData();
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +143,17 @@ export default function DataPage() {
     }
   }
 
+  async function handleScheduleDateChange(date: string | null) {
+    setError(null);
+    try {
+      await setScheduleOperatingDate(date);
+      setSchedulePage(1);
+      setAircraftPage(1);
+    } catch (e) {
+      setError(`Schedule date filter error: ${(e as Error).message}`);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-start justify-between gap-4">
@@ -162,7 +176,7 @@ export default function DataPage() {
             }
             className="h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium px-4 disabled:opacity-50 hover:opacity-90"
           >
-            {saving ? "Saving…" : "Save to Supabase"}
+            {saving ? "Saving..." : "Save to Supabase"}
           </button>
         )}
       </div>
@@ -244,6 +258,13 @@ export default function DataPage() {
           templateName="template_disruption.csv"
         />
       </div>
+
+      {scheduleDateFilter && (
+        <ScheduleDateFilterSelect
+          filter={scheduleDateFilter}
+          onChange={handleScheduleDateChange}
+        />
+      )}
 
       {pasteOpen && (
         <PasteDialog
@@ -640,6 +661,7 @@ function PasteDialog({
 function Uploader({
   title,
   count,
+  countLabel,
   accept,
   onFile,
   onPaste,
@@ -649,6 +671,7 @@ function Uploader({
 }: {
   title: string;
   count: number;
+  countLabel?: string;
   accept: string;
   onFile: (f: File) => void | Promise<void>;
   onPaste: () => void;
@@ -656,32 +679,34 @@ function Uploader({
   template: string;
   templateName: string;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const inputId = `data-upload-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const templateHref =
     "data:text/csv;charset=utf-8," + encodeURIComponent(template);
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{title}</h3>
-        <span className="text-xs text-zinc-500">{count} rows</span>
+        <span className="text-xs text-zinc-500">
+          {countLabel ?? `${count} rows`}
+        </span>
       </div>
       <input
-        ref={ref}
+        id={inputId}
         type="file"
         accept={accept}
-        className="hidden"
+        className="sr-only"
         onChange={async (e) => {
           const f = e.target.files?.[0];
           if (f) await onFile(f);
           if (e.target) e.target.value = "";
         }}
       />
-      <button
-        onClick={() => ref.current?.click()}
-        className="mt-3 w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+      <label
+        htmlFor={inputId}
+        className="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:opacity-90"
       >
         Upload CSV/XLSX
-      </button>
+      </label>
       <button
         onClick={onPaste}
         className="mt-2 w-full h-8 rounded-md border border-border text-xs font-medium hover:bg-muted"

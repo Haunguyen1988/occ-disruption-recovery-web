@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { Aircraft, FlightLeg } from "@/lib/types";
-import type { ValidationIssue } from "@/lib/parsers/csv";
+import type { ImportDateCandidate, ValidationIssue } from "@/lib/parsers/csv";
 import { getAirportTimezone, localToUtc } from "@/lib/engine/time-utils";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +100,86 @@ function parseAimsDate(value: string): ParsedAimsDate | null {
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   const iso = `${year}-${pad2(month)}-${pad2(day)}`;
   return { iso, year, month, day };
+}
+
+function isAimsDataRow(raw: unknown[]): boolean {
+  const flt = String(raw[1] ?? "").trim();
+  const reg = String(raw[2] ?? "").trim();
+  return Boolean(flt && reg);
+}
+
+export function detectAimsDayRepDates(
+  matrix: unknown[][],
+): ImportDateCandidate[] {
+  if (!looksLikeAimsDayRep(matrix)) return [];
+  const buckets = new Map<
+    string,
+    {
+      rowCount: number;
+      firstTime?: string;
+      lastTime?: string;
+      sampleFlights: string[];
+    }
+  >();
+
+  for (let i = HEADER_ROW_INDEX + 1; i < matrix.length; i++) {
+    const row = matrix[i];
+    if (!Array.isArray(row) || !isAimsDataRow(row)) continue;
+    const parsed = parseAimsDate(String(row[0] ?? ""));
+    if (!parsed) continue;
+    const std = String(row[7] ?? "").trim();
+    const bucket =
+      buckets.get(parsed.iso) ??
+      {
+        rowCount: 0,
+        firstTime: undefined,
+        lastTime: undefined,
+        sampleFlights: [],
+      };
+    bucket.rowCount += 1;
+    if (parseHHMM(std)) {
+      if (!bucket.firstTime || std < bucket.firstTime) {
+        bucket.firstTime = std;
+      }
+      if (!bucket.lastTime || std > bucket.lastTime) {
+        bucket.lastTime = std;
+      }
+    }
+    const sample = String(row[1] ?? "").trim();
+    if (sample && bucket.sampleFlights.length < 4) {
+      bucket.sampleFlights.push(sample);
+    }
+    buckets.set(parsed.iso, bucket);
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, bucket]) => ({
+      date,
+      rowCount: bucket.rowCount,
+      firstTime: bucket.firstTime,
+      lastTime: bucket.lastTime,
+      sourceColumns: ["DATE"],
+      sampleFlights: bucket.sampleFlights,
+    }));
+}
+
+export function filterAimsDayRepByDate(
+  matrix: unknown[][],
+  selectedDate: string,
+): unknown[][] {
+  if (!looksLikeAimsDayRep(matrix)) return matrix;
+  const filtered = matrix.slice(0, HEADER_ROW_INDEX + 1);
+  for (let i = HEADER_ROW_INDEX + 1; i < matrix.length; i++) {
+    const row = matrix[i];
+    if (!Array.isArray(row) || !isAimsDataRow(row)) {
+      filtered.push(row);
+      continue;
+    }
+    const parsed = parseAimsDate(String(row[0] ?? ""));
+    if (parsed?.iso === selectedDate) filtered.push(row);
+  }
+  return filtered;
 }
 
 /** Advance a Y-M-D triple by `days` days, returning the new triple. */
@@ -462,6 +542,14 @@ export function parseAimsDayRep(matrix: unknown[][]): AimsParseResult {
 export async function tryParseAimsWorkbook(
   file: File | Blob,
 ): Promise<AimsParseResult | null> {
+  const matrix = await tryReadAimsWorkbookMatrix(file);
+  if (!matrix) return null;
+  return parseAimsDayRep(matrix);
+}
+
+export async function tryReadAimsWorkbookMatrix(
+  file: File | Blob,
+): Promise<unknown[][] | null> {
   const name = "name" in file ? (file as File).name.toLowerCase() : "";
   if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) return null;
   const buf = await file.arrayBuffer();
@@ -474,5 +562,5 @@ export async function tryParseAimsWorkbook(
     raw: false,
   });
   if (!looksLikeAimsDayRep(matrix)) return null;
-  return parseAimsDayRep(matrix);
+  return matrix;
 }

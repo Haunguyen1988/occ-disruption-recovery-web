@@ -31,6 +31,15 @@ export interface ParseResult<T> {
   issues: ValidationIssue[];
 }
 
+export interface ImportDateCandidate {
+  date: string;
+  rowCount: number;
+  firstTime?: string;
+  lastTime?: string;
+  sourceColumns: string[];
+  sampleFlights: string[];
+}
+
 const DISRUPTION_TYPES: DisruptionType[] = [
   "AOG",
   "AIRPORT_CLOSE",
@@ -121,6 +130,8 @@ function parseDate(value: unknown): Date {
  *   - "2026-04-28T07:00:00Z"  (Z is stripped — caller provides the real tz)
  *   - "2026-04-28T07:00"      (no seconds)
  *   - "2026-04-28 07:00:00"   (space separator)
+ *   - "28/04/2026 07:00"      (Excel text export, DD/MM/YYYY)
+ *   - Date / Excel serial values from XLSX cells
  */
 interface LocalDateTime {
   year: number;
@@ -131,16 +142,53 @@ interface LocalDateTime {
 }
 
 function parseLocalDateTime(value: unknown): LocalDateTime | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return {
+      year: value.getUTCFullYear(),
+      month: value.getUTCMonth() + 1,
+      day: value.getUTCDate(),
+      hour: value.getUTCHours(),
+      minute: value.getUTCMinutes(),
+    };
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    return parseLocalDateTime(new Date(epoch.getTime() + value * 86400000));
+  }
   if (typeof value !== "string") return null;
   const v = value.trim().replace(/Z$/i, ""); // strip Z — we use the airport tz
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(v);
-  if (!m) return null;
+  if (!m) {
+    const dmy =
+      /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})[ T](\d{1,2}):(\d{2})/.exec(v);
+    if (!dmy) return null;
+    const year =
+      dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    return {
+      year,
+      month: Number(dmy[2]),
+      day: Number(dmy[1]),
+      hour: Number(dmy[4]),
+      minute: Number(dmy[5]),
+    };
+  }
   return {
     year: Number(m[1]),
     month: Number(m[2]),
     day: Number(m[3]),
     hour: Number(m[4]),
     minute: Number(m[5]),
+  };
+}
+
+function operatingDateFromScheduleRow(
+  row: Record<string, unknown>,
+): { date: string; time?: string } | null {
+  const parsed = parseLocalDateTime(row.std);
+  if (!parsed) return null;
+  return {
+    date: `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(parsed.day).padStart(2, "0")}`,
+    time: `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`,
   };
 }
 
@@ -269,28 +317,114 @@ function checkRequiredHeaders(
 
 export type ParsedRows = Record<string, unknown>[];
 
+function normalizeColumnName(column: string): string {
+  return column
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-./]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function normalizeRowKeys(rows: ParsedRows): ParsedRows {
+  return rows.map((row) => {
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      const normalizedKey = normalizeColumnName(key);
+      if (!normalizedKey) continue;
+      normalized[normalizedKey] = value;
+    }
+    return normalized;
+  });
+}
+
 export async function parseCsvOrXlsx(file: File | Blob): Promise<ParsedRows> {
   const name = "name" in file ? (file as File).name.toLowerCase() : "";
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array", cellDates: true });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    return normalizeRowKeys(XLSX.utils.sheet_to_json(sheet, { defval: "" }));
   }
   const text = await file.text();
   const result = Papa.parse(text, {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
+    transformHeader: normalizeColumnName,
   });
-  return result.data as ParsedRows;
+  return normalizeRowKeys(result.data as ParsedRows);
 }
 
 // ---------------------------------------------------------------------------
 // Per-dataset parsers — collect issues, never throw on bad rows
 // ---------------------------------------------------------------------------
 
+export function detectScheduleRowDates(rows: ParsedRows): ImportDateCandidate[] {
+  rows = normalizeRowKeys(rows);
+  const buckets = new Map<
+    string,
+    {
+      rowCount: number;
+      firstTime?: string;
+      lastTime?: string;
+      sampleFlights: string[];
+    }
+  >();
+
+  for (const row of rows) {
+    const detected = operatingDateFromScheduleRow(row);
+    if (!detected) continue;
+    const bucket =
+      buckets.get(detected.date) ??
+      {
+        rowCount: 0,
+        firstTime: undefined,
+        lastTime: undefined,
+        sampleFlights: [],
+      };
+    bucket.rowCount += 1;
+    if (detected.time) {
+      if (!bucket.firstTime || detected.time < bucket.firstTime) {
+        bucket.firstTime = detected.time;
+      }
+      if (!bucket.lastTime || detected.time > bucket.lastTime) {
+        bucket.lastTime = detected.time;
+      }
+    }
+    const sample = String(row.flight_number ?? row.flight_id ?? "").trim();
+    if (sample && bucket.sampleFlights.length < 4) {
+      bucket.sampleFlights.push(sample);
+    }
+    buckets.set(detected.date, bucket);
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, bucket]) => ({
+      date,
+      rowCount: bucket.rowCount,
+      firstTime: bucket.firstTime,
+      lastTime: bucket.lastTime,
+      sourceColumns: ["std"],
+      sampleFlights: bucket.sampleFlights,
+    }));
+}
+
+export function filterScheduleRowsByDate(
+  rows: ParsedRows,
+  selectedDate: string,
+): ParsedRows {
+  return normalizeRowKeys(rows).filter((row) => {
+    const detected = operatingDateFromScheduleRow(row);
+    return detected?.date === selectedDate;
+  });
+}
+
 export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
+  rows = normalizeRowKeys(rows);
   const issues = checkRequiredHeaders(rows, SCHEDULE_REQUIRED, "schedule");
   if (issues.some((i) => i.level === "error")) {
     return { data: [], issues };
@@ -470,6 +604,7 @@ export function parseScheduleRows(rows: ParsedRows): ParseResult<FlightLeg> {
 }
 
 export function parseAircraftRows(rows: ParsedRows): ParseResult<Aircraft> {
+  rows = normalizeRowKeys(rows);
   const issues = checkRequiredHeaders(rows, AIRCRAFT_REQUIRED, "aircraft");
   if (issues.some((i) => i.level === "error")) {
     return { data: [], issues };
@@ -552,6 +687,7 @@ export function parseAircraftRows(rows: ParsedRows): ParseResult<Aircraft> {
 export function parseDisruptionRows(
   rows: ParsedRows,
 ): ParseResult<DisruptionEvent> {
+  rows = normalizeRowKeys(rows);
   const issues = checkRequiredHeaders(rows, DISRUPTION_REQUIRED, "disruption");
   if (issues.some((i) => i.level === "error")) {
     return { data: [], issues };

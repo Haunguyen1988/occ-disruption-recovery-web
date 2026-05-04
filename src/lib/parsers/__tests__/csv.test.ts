@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  detectScheduleRowDates,
+  filterScheduleRowsByDate,
   parseAircraftRows,
+  parseCsvOrXlsx,
   parseDisruptionRows,
   parseScheduleRows,
   rowsToDisruption,
@@ -28,6 +31,93 @@ describe("parseScheduleRows", () => {
     const r = parseScheduleRows([goodRow]);
     expect(r.data).toHaveLength(1);
     expect(r.issues).toHaveLength(0);
+  });
+
+  it("accepts common exported header variants", async () => {
+    const csv =
+      "\uFEFFFlight ID,Flight Number, Origin ,Destination,STD,STA,Aircraft ID,Aircraft Type,Priority Level,Load Factor,Is International,Is Last Flight Of Day\n" +
+      "FL001,VJ100,SGN,HAN,2026-04-28T07:00:00Z,2026-04-28T09:10:00Z,VJ-A321,A321,1,0.91,false,false\n";
+    const rows = await parseCsvOrXlsx(
+      new File([csv], "schedule.csv", { type: "text/csv" }),
+    );
+
+    const parsed = parseScheduleRows(rows);
+    expect(parsed.issues).toHaveLength(0);
+    expect(parsed.data[0]).toMatchObject({
+      flight_id: "FL001",
+      aircraft_id: "VJ-A321",
+    });
+  });
+
+  it("detects and filters multiple operating dates from schedule rows", () => {
+    const rows = [
+      goodRow,
+      {
+        ...goodRow,
+        flight_id: "FL002",
+        flight_number: "VJ101",
+        std: "2026-04-29T08:00:00Z",
+        sta: "2026-04-29T10:10:00Z",
+      },
+      {
+        ...goodRow,
+        flight_id: "FL003",
+        flight_number: "VJ102",
+        std: "2026-04-29T12:00:00",
+        sta: "2026-04-29T14:10:00",
+      },
+    ];
+
+    const candidates = detectScheduleRowDates(rows);
+    expect(candidates).toMatchObject([
+      {
+        date: "2026-04-28",
+        rowCount: 1,
+        firstTime: "07:00",
+        lastTime: "07:00",
+        sourceColumns: ["std"],
+      },
+      {
+        date: "2026-04-29",
+        rowCount: 2,
+        firstTime: "08:00",
+        lastTime: "12:00",
+        sourceColumns: ["std"],
+      },
+    ]);
+
+    expect(filterScheduleRowsByDate(rows, "2026-04-29").map((r) => r.flight_id))
+      .toEqual(["FL002", "FL003"]);
+  });
+
+  it("accepts Excel date cells and serials for schedule STD/STA", () => {
+    const serial =
+      (Date.UTC(2026, 3, 29, 8, 0) - Date.UTC(1899, 11, 30)) / 86400000;
+    const rows = [
+      {
+        ...goodRow,
+        flight_id: "FL-XLSX-1",
+        std: new Date(Date.UTC(2026, 3, 28, 7, 0)),
+        sta: new Date(Date.UTC(2026, 3, 28, 9, 10)),
+      },
+      {
+        ...goodRow,
+        flight_id: "FL-XLSX-2",
+        std: serial,
+        sta: serial + 2 / 24,
+      },
+    ];
+
+    expect(detectScheduleRowDates(rows)).toMatchObject([
+      { date: "2026-04-28", rowCount: 1 },
+      { date: "2026-04-29", rowCount: 1 },
+    ]);
+    const parsed = parseScheduleRows(rows);
+    expect(parsed.issues.filter((i) => i.level === "error")).toHaveLength(0);
+    expect(parsed.data.map((f) => f.flight_id)).toEqual([
+      "FL-XLSX-1",
+      "FL-XLSX-2",
+    ]);
   });
 
   it("parses optional passenger fields when present", () => {

@@ -1,6 +1,6 @@
 # Active Context
 
-Last updated: 2026-05-02
+Last updated: 2026-05-04
 
 ## Where The Project Is
 
@@ -9,6 +9,12 @@ The app is a working MVP. It builds, lints, and the current tests pass. The main
 The review identified four actionable findings. All four have been fixed, and Phase 2 runtime-smoothness work now includes parser/UI improvements plus an engine schedule index.
 
 All four original review findings have now been addressed in code.
+
+## Latest Upload And Simulate Recheck
+
+- CSV/XLSX upload now normalizes common exported header variants (`Flight ID`, `Aircraft ID`, spaces, dashes, dots, and BOM-prefixed first columns) before schedule/aircraft/disruption parsing.
+- `/dashboard/simulate` now shows parser and cross-dataset import issues inline and disables the Run button while any import error remains, avoiding silent partial-data simulations.
+- Verification on 2026-05-04: `npm.cmd run lint` passed; targeted CSV parser test passed with escalation after sandbox `spawn EPERM` (28 tests); `npm.cmd run build` passed with escalation after sandbox `.next` unlink `EPERM`.
 
 ## What Not To Forget
 

@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as XLSX from "xlsx";
-import { looksLikeAimsDayRep, parseAimsDayRep } from "@/lib/parsers/aims";
+import {
+  detectAimsDayRepDates,
+  filterAimsDayRepByDate,
+  looksLikeAimsDayRep,
+  parseAimsDayRep,
+} from "@/lib/parsers/aims";
 
 function loadFixtureMatrix(): unknown[][] {
   const file = path.join(
@@ -38,6 +43,46 @@ describe("AIMS DayRep parser", () => {
         ["foo", "bar", "baz", "", "qux"],
       ]),
     ).toBe(false);
+  });
+
+  it("detects and filters multiple DayRep operating dates", () => {
+    const matrix = [
+      [],
+      [],
+      [],
+      [],
+      [],
+      ["DATE", "FLT", "REG", "", "AC", "DEP", "ARR", "STD", "STA"],
+      ["28/04/26", "100", "VN-A321", "", "321", "SGN", "HAN", "07:00", "09:10"],
+      ["29/04/26", "101", "VN-A321", "", "321", "SGN", "HAN", "08:00", "10:10"],
+      ["29/04/26", "102", "VN-A322", "", "321", "HAN", "SGN", "11:00", "13:10"],
+      ["Total Record(s): 3"],
+    ];
+
+    expect(detectAimsDayRepDates(matrix)).toMatchObject([
+      {
+        date: "2026-04-28",
+        rowCount: 1,
+        firstTime: "07:00",
+        lastTime: "07:00",
+        sourceColumns: ["DATE"],
+      },
+      {
+        date: "2026-04-29",
+        rowCount: 2,
+        firstTime: "08:00",
+        lastTime: "11:00",
+        sourceColumns: ["DATE"],
+      },
+    ]);
+
+    const filtered = parseAimsDayRep(
+      filterAimsDayRepByDate(matrix, "2026-04-29"),
+    );
+    expect(filtered.schedule.map((f) => f.flight_number)).toEqual([
+      "101",
+      "102",
+    ]);
   });
 
   it("parses the full DayRep into 325 flights with 0 errors", () => {
