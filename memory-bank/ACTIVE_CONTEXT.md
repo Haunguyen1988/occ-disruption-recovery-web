@@ -16,6 +16,14 @@ All four original review findings have now been addressed in code.
 - `/dashboard/simulate` now shows parser and cross-dataset import issues inline and disables the Run button while any import error remains, avoiding silent partial-data simulations.
 - Verification on 2026-05-04: `npm.cmd run lint` passed; targeted CSV parser test passed with escalation after sandbox `spawn EPERM` (28 tests); `npm.cmd run build` passed with escalation after sandbox `.next` unlink `EPERM`.
 
+## Latest Quick Report And PDF Export
+
+- Added `/dashboard/report/[uuid]` as a print-ready saved-simulation report.
+- The report uses saved simulation data plus related audit rows and includes executive summary metrics, option ranking chart, delay/passenger impact chart, score-breakdown chart, recommended recovery plan, passenger impact detail, aircraft recovery optimizer diagnostics, and audit trail.
+- Added an `Export PDF` button that calls browser print, with print CSS hiding navigation/actions and laying out the report as A4 landscape.
+- `/dashboard/audit/[uuid]` now links to the report, and `/dashboard/simulate` shows `Open report` after a simulation is saved.
+- Verification on 2026-05-04: `npm.cmd run lint` passed; `npm.cmd run build` first hit sandbox `.next` unlink `EPERM`, then passed with escalation.
+
 ## What Not To Forget
 
 - The existing `.brain/` folder is local session noise, not the durable memory bank. It is now ignored by git.

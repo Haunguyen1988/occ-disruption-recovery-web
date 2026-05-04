@@ -24,6 +24,7 @@ Latest release-gate recheck on 2026-05-03:
 - Before the final pass, a stale `DEEP_DELAY` upgrade-verification assertion was fixed. `DEEP_DELAY` now marks the selected low-priority flight while still carrying the full flight impact plan.
 - Production readiness docs now use the current passenger-scored S8 benchmark values, and the release-notes template captures the full optimizer diagnostics printed by the benchmark.
 - Upload/simulate recheck on 2026-05-04: CSV/XLSX upload now normalizes common exported headers such as `Flight ID`, trims/BOM-strips columns, and `/dashboard/simulate` surfaces parser/cross-dataset issues and blocks simulation while import errors remain. Verification: `npm.cmd run lint` passed, targeted CSV parser test passed with escalation after sandbox `spawn EPERM`, and `npm.cmd run build` passed with escalation after sandbox `.next` unlink `EPERM`.
+- Quick report/PDF work on 2026-05-04: added `/dashboard/report/[uuid]`, a print-ready saved-simulation report with executive summary, option ranking, delay/passenger charts, score breakdown, recovery plan, optimizer diagnostics, and audit trail. `Export PDF` uses browser print with print CSS. Links were added from simulation save results and audit detail. Verification: `npm.cmd run lint` passed; `npm.cmd run build` passed with escalation after sandbox `.next` unlink `EPERM`.
 
 Earlier commands run on 2026-05-02 after the tail-assignment ranking explanation and S8 UAT-doc alignment pass:
 
@@ -76,6 +77,7 @@ Known local caveats:
 31. Updated on 2026-05-03: `DEEP_DELAY` now marks the selected low-priority flight even when propagation already imposes a larger delay, and the upgrade-verification test now checks that marker instead of assuming only one flight change.
 32. Updated on 2026-05-03: the unused `createPartialSwapHybrid` helper was removed and lint is clean for the production gate.
 33. Updated on 2026-05-03: `docs/PROD_READINESS.md` and `docs/PROD_RELEASE_NOTES_TEMPLATE.md` were aligned with the latest passenger-scored S8 benchmark and optimizer diagnostic fields.
+34. Updated on 2026-05-04: saved simulations now have a print-ready report route at `/dashboard/report/[uuid]` with browser PDF export and built-in charts for option scores, delay/passenger impact, and score breakdown.
 
 ## Recommended Next Step
 

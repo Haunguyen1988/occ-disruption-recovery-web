@@ -79,3 +79,42 @@ body {
   border: 1px solid var(--border);
   box-shadow: 0 10px 28px rgba(16, 24, 40, 0.05);
 }
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  :root {
+    --background: #ffffff;
+    --foreground: #111827;
+    --muted: #f3f4f6;
+    --border: #d1d5db;
+    --panel: #ffffff;
+    --panel-subtle: #ffffff;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .report-page {
+    max-width: none !important;
+  }
+
+  .report-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

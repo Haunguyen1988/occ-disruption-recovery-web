@@ -38,14 +38,28 @@ export default async function SimulationDetailPage({
         >
           Back to Audit
         </Link>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Simulation detail
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Saved recovery options and related audit activity for one simulation.
-            Timestamps below are shown in UTC ISO 8601.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Simulation detail
+            </h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              Saved recovery options and related audit activity for one simulation.
+              Timestamps below are shown in UTC ISO 8601.
+            </p>
+          </div>
+          <Link
+            href={`/dashboard/report/${simulation.uuid}`}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Open report
+          </Link>
+          <Link
+            href={`/dashboard/report/${simulation.uuid}?print=1`}
+            className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+          >
+            Export PDF
+          </Link>
         </div>
       </div>
 

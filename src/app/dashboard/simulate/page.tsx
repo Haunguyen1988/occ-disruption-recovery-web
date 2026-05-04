@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/components/data-context";
 import { GanttSchedule } from "@/components/gantt-schedule";
 import { ScheduleDateFilterSelect } from "@/components/schedule-date-selection";
+import Link from "next/link";
 import {
   analyzeMultiEventConflicts,
   applyRecoveryObjectiveProfile,
@@ -760,6 +761,22 @@ export default function SimulatePage() {
                         ? "Saving…"
                         : "Save simulation"}
                   </button>
+                )}
+                {savedUuid && (
+                  <>
+                    <Link
+                      href={`/dashboard/report/${savedUuid}`}
+                      className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                    >
+                      Open report
+                    </Link>
+                    <Link
+                      href={`/dashboard/report/${savedUuid}?print=1`}
+                      className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+                    >
+                      Export PDF
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
